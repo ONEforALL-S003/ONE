@@ -23,6 +23,7 @@
 #include <json.h>
 #include <fstream>
 #include <unordered_map>
+#include <boost/filesystem.hpp>
 
 using namespace q_implant;
 
@@ -34,10 +35,10 @@ namespace
 {
 
 // Return directory path of given file path
-// TODO Find a platform-independent way to do this
+// Use boost library for platform-independent directory separator
 std::string directory_path(const std::string &file_path)
 {
-  const auto pos = file_path.find_last_of("/");
+  const auto pos = file_path.find_last_of(boost::filesystem::path::preferred_separator);
   if (std::string::npos == pos)
     return "";
 
@@ -220,8 +221,8 @@ void QImplant::write(loco::Graph *g)
 
     verify_tensor(tensor);
 
-    const auto scale_path = dir_path + '/' + tensor["scale"].asString();
-    const auto zerop_path = dir_path + '/' + tensor["zerop"].asString();
+    const auto scale_path = dir_path + boost::filesystem::path::preferred_separator + tensor["scale"].asString();
+    const auto zerop_path = dir_path + boost::filesystem::path::preferred_separator + tensor["zerop"].asString();
     const auto quantized_dimension = tensor["quantized_dimension"].asUInt();
     const auto dtype = str_to_dtype(tensor["dtype"].asString());
 
@@ -240,7 +241,7 @@ void QImplant::write(loco::Graph *g)
     if (tensor.isMember("value"))
     {
       auto const_node = loco::must_cast<luci::CircleConst *>(node);
-      const auto value_path = dir_path + '/' + tensor["value"].asString();
+      const auto value_path = dir_path + boost::filesystem::path::preferred_separator + tensor["value"].asString();
 
       set_value(const_node, value_path, dtype);
     }
