@@ -20,22 +20,22 @@ import json
 class TfFbParamExporter:
     # Need to update dictionary when Tensorflow Lite Tensor Type Updated
     tensor_resolver = {
-        0: 'FLOAT32',
-        1: 'FLOAT16',
-        2: 'INT32',
-        3: 'UINT8',
-        4: 'INT64',
-        5: 'STRING',
-        6: 'BOOL',
-        7: 'INT16',
-        8: 'COMPLEX64',
-        9: 'INT8',
-        10: 'FLOAT64',
-        11: 'COMPLEX128',
-        12: 'UINT64',
-        13: 'RESOURCE',
-        14: 'VARIANT',
-        15: 'UINT32'
+        0: ['FLOAT32', np.float32],
+        1: ['FLOAT16', np.float16],
+        2: ['INT32', np.int32],
+        3: ['UINT8', np.uint8],
+        4: ['INT64', np.int64],
+        5: ['STRING', np.string_],
+        6: ['BOOL', np.bool_],
+        7: ['INT16', np.uint16],
+        8: ['COMPLEX64', np.complex64],
+        9: ['INT8', np.int8],
+        10: ['FLOAT64', np.float64],
+        11: ['COMPLEX128', np.complex128],
+        12: ['UINT64', np.uint64],
+        13: ['RESOURCE', ],  # TODO Not sure about what to give
+        14: ['VARIANT', ],  # TODO Not sure about what to give
+        15: ['UINT32', np.uint32]
     }
 
     def __save_np(self, data):
@@ -70,6 +70,7 @@ class TfFbParamExporter:
         for idx in range(graph.TensorsLength()):
             tensor = graph.Tensors(idx)
             tensor_type = TfFbParamExporter.tensor_resolver[tensor.Type()]
+            shape = tensor.ShapeAsNumpy()
             name = tensor.Name()
             buffer = self.__model.Buffers(tensor.Buffer())
             quantization = tensor.Quantization()
@@ -84,15 +85,19 @@ class TfFbParamExporter:
             if scales.size != scale_legnth or zerop.size != zerop_length:
                 raise Exception('Quantization Conflict')
             dimension = quantization.QuantizedDimension()
-            value = buffer.DataAsNumpy()
             data = {
-                'dtype': tensor_type,
+                'dtype': tensor_type[0],
                 'name': str(name, 'utf-8'),  # TODO Wee need to consider whether trim prefix/suffix or not
                 'scale': scales,
                 'zerop': zerop,
                 'quantized_dimension': dimension,
-                'value': value
+                'value': 0
             }
+            value = buffer.DataAsNumpy()
+            if type(value) == numpy.ndarray:
+                value = np.frombuffer(value, dtype=tensor_type[1])
+                value = np.reshape(value, shape)
+                data['value'] = value
             tensors.append(data)
         return tensors
 
