@@ -170,7 +170,10 @@ class TorchQParamExporter:  #  TODO: Think about better class name
         if not os.path.exists(self.__dir_path):
             os.makedirs(self.__dir_path, exist_ok=True)
 
-        mapping = self.__mapping
+        if self.__mapping is None:
+            mapping = {}
+        else:
+            mapping = self.__mapping
 
         for name, layer in tree.items():
             dtype = 'uint8'
