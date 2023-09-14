@@ -259,7 +259,35 @@ void QImplant::write(loco::Graph *g)
     auto out_node = loco::must_cast<luci::CircleOutput *>(node);
     auto from_node = loco::must_cast<luci::CircleNode *>(out_node->from());
 
-    THROW_UNLESS(from_node->quantparam());
+    if(from_node->quantparam() == nullptr){
+      std::deque<luci::CircleNode *> que;
+      auto previous = preds(from_node);
+
+      do{
+        bool found = false;
+        for(auto prev : previous){
+          auto prev_circle_node = loco::must_cast<luci::CircleNode *>(prev);
+          if(prev_circle_node->quantparam() != nullptr){
+            const auto tensor = root[prev_circle_node->name()];
+            if (tensor.isMember("value"))
+            {
+              continue;
+            }
+            from_node = prev_circle_node;
+            found = true;
+            break;
+          }
+          que.emplace_back(prev_circle_node);
+        }
+
+        if(found)
+          break;
+
+        assert(!que.empty());
+        previous = preds(que.front());
+        que.pop_front();
+      } while (true);
+    }
 
     out_node->quantparam(std::make_unique<luci::CircleQuantParam>());
     out_node->quantparam()->scale = from_node->quantparam()->scale;
