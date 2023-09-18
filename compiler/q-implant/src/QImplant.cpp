@@ -23,6 +23,7 @@
 #include <json.h>
 #include <fstream>
 #include <unordered_map>
+#include <set>
 
 using namespace q_implant;
 
@@ -32,8 +33,17 @@ using namespace q_implant;
 
 namespace
 {
+    // TODO: Add more operations needs
+    std::set<luci::CircleOpcode> without_value_op{
+        luci::CircleOpcode::TRANSPOSE,
+        luci::CircleOpcode::SPLIT,
+        luci::CircleOpcode::RESHAPE,
+        luci::CircleOpcode::CONCATENATION,
+        luci::CircleOpcode::ABS,
+        luci::CircleOpcode::NEG
+    };
 
-// Return directory path of given file path
+    // Return directory path of given file path
 // TODO Find a platform-independent way to do this
 std::string directory_path(const std::string &file_path)
 {
@@ -248,6 +258,27 @@ void QImplant::write(loco::Graph *g)
       const auto value_path = dir_path + '/' + tensor["value"].asString();
 
       set_value(const_node, value_path, dtype);
+    }
+
+    std::deque<luci::CircleNode *> que;
+    auto children = loco::succs(node);
+    while(true){
+      for(auto child : children){
+        auto child_node = loco::must_cast<luci::CircleNode *>(child);
+        if(without_value_op.find(child_node->opcode()) != without_value_op.end()){
+          child_node->quantparam(std::make_unique<luci::CircleQuantParam>());
+          set_dtype(child_node, dtype);
+          set_scale(child_node, scale_path);
+          set_zerop(child_node, zerop_path);
+          set_quantized_dimension(child_node, quantized_dimension);
+          que.emplace_back(child_node);
+        }
+      }
+      if(que.size() == 0){
+        break;
+      }
+      children = loco::succs(que.front());
+      que.pop_front();
     }
   }
 
