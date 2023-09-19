@@ -1,0 +1,2 @@
+addeval(Conv2d)
+addeval(Linear)
