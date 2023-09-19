@@ -111,24 +111,38 @@ if __name__ == "__main__":
                 partial_graph_data=test_mapped_list[i][1])
             extractor.generate_files(test_mapped_list[i][0])
 
+            flag = 0
+
             for j in range(2):
-                if os.path.exists(json_paths[2 * j]) ^ os.path.exists(json_paths[2 * j + 1]):
-                    raise Exception
-                if not os.path.exists(json_paths[2 * j]):
-                    continue
-                with open(json_paths[2 * j], 'r') as json_file:
-                    test_json = json.load(json_file)
-                with open(json_paths[2 * j + 1], 'r') as json_file:
-                    compare_json = json.load(json_file)
-                test_keys = test_json.keys()
-                compare_keys = compare_json.keys()
+                try:
+                    if os.path.exists(json_paths[2 * j]) ^ os.path.exists(json_paths[2 * j + 1]):
+                        raise Exception
+                    if not os.path.exists(json_paths[2 * j]):
+                        continue
+                    with open(json_paths[2 * j], 'r') as json_file:
+                        test_json = json.load(json_file)
+                    with open(json_paths[2 * j + 1], 'r') as json_file:
+                        compare_json = json.load(json_file)
+                    test_keys = test_json.keys()
+                    compare_keys = compare_json.keys()
 
-                if (test_keys & compare_keys) != test_keys:
-                    raise Exception
+                    if (test_keys & compare_keys) != test_keys:
+                        raise Exception
 
-                for key in test_keys:
-                    check_operator(test_json[key], compare_json[key],
-                                   current_test_path, current_compare_path)
+                    for key in test_keys:
+                        check_operator(test_json[key], compare_json[key],
+                                       current_test_path, current_compare_path)
+                except:
+                    if j == 0:
+                        flag |= 0b01
+                    elif j == 1:
+                        flag |= 0b10
+            if flag == 0b00:
+                continue
+            elif flag == 0b01:
+                raise Exception('Test fails due to different mapping. (Maybe different onnx_tf version)')
+            else:
+                raise Exception('Test fails')
 
     shutil.rmtree(test_work_dir)
 
