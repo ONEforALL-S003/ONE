@@ -32,17 +32,19 @@ from include.circle.Model import Model
 
 
 class Torch2Circle:
-
     @staticmethod
-    def toCircle(original_model: torch.nn.Module, sample_input: torch.Tensor, dir_path: str,
-                 tflite2circle_path='./tflite2circle', clean_circle=True):
+    def toCircle(original_model: torch.nn.Module,
+                 sample_input: torch.Tensor,
+                 dir_path: str,
+                 tflite2circle_path='tflite2circle',
+                 clean_circle=True):
         if not os.path.exists(tflite2circle_path):
             raise Exception('tflite2circle not exists')
         tmp_path = os.path.join(dir_path, 'tmp')
         if not os.path.exists(tmp_path):
             os.makedirs(tmp_path, exist_ok=True)
-        tmp_path = os.path.join(dir_path, 'tmp')
-        onnx_inferred_model = Torch2Circle.__toOnnx(original_model, sample_input, tmp_path)
+        onnx_inferred_model = Torch2Circle.__toOnnx(original_model, sample_input,
+                                                    tmp_path)
         tflite_path = Torch2Circle.__toTflite(onnx_inferred_model, tmp_path)
         circle_path = os.path.join(dir_path, 'input.circle')
         circle = Torch2Circle.__toCircle(tflite_path, circle_path, tflite2circle_path)
@@ -63,7 +65,8 @@ class Torch2Circle:
         return inferred_model
 
     @staticmethod
-    def __toTflite(onnx_inferred_model: onnx.onnx_ONNX_REL_1_7_ml_pb2.ModelProto, dir_path: str):
+    def __toTflite(onnx_inferred_model: onnx.onnx_ONNX_REL_1_7_ml_pb2.ModelProto,
+                   dir_path: str):
         tf_prep = onnx_tf.backend.prepare(onnx_inferred_model)
         tf_path = os.path.join(dir_path, 'tmp.tf')
         tf_prep.export_graph(path=tf_path)

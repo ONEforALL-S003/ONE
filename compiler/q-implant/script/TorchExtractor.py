@@ -21,7 +21,9 @@ import collections
 import json
 import torch.nn.quantized.modules.linear
 
-def quantize_tensor(tensor: torch.Tensor, scale, zero_point, dtype=np.int8) -> torch.Tensor:
+
+def quantize_tensor(tensor: torch.Tensor, scale, zero_point,
+                    dtype=np.int8) -> torch.Tensor:
     if dtype not in (np.uint8, np.int8, np.int32):
         raise Exception('Please check dtype')
     new_tensor = tensor.clone().detach().numpy()
@@ -31,9 +33,18 @@ def quantize_tensor(tensor: torch.Tensor, scale, zero_point, dtype=np.int8) -> t
 
 class TorchExtractor:
     qdtype_mapping = {
-        torch.quint8: {'str': "uint8", 'np': np.uint8},
-        torch.qint8: {'str': "int8", 'np': np.int8},
-        torch.qint32: {'str': "int32", 'np': np.int32}
+        torch.quint8: {
+            'str': "uint8",
+            'np': np.uint8
+        },
+        torch.qint8: {
+            'str': "int8",
+            'np': np.int8
+        },
+        torch.qint32: {
+            'str': "int32",
+            'np': np.int32
+        }
     }
 
     @staticmethod
@@ -43,7 +54,8 @@ class TorchExtractor:
             tensor = tensor.permute(0, 2, 3, 1)
         return tensor
 
-    def __init__(self, quantized_model: torch.nn.Module, json_path: str, partial_graph_data: None):
+    def __init__(self, quantized_model: torch.nn.Module, json_path: str,
+                 partial_graph_data: None):
         self.__np_idx = 0
         self.__input_dtype = None
         self.__graph_data = collections.OrderedDict()
@@ -63,15 +75,24 @@ class TorchExtractor:
         partial_graph_data = self.__partial_graph_data
         # Restructuring Neural Network model
         for name, mod in module.named_modules():
-            # Need to skip just Module. Only Operator/Tensor/Activation Needed
-            # When just using isintance, all of operator/tensor/activation belong to it(All of them inherit torch.nn.modules.Module)
-            # TODO: check whether there is better way to check instance of torch.nn.quantized.modules.* and not torch.nn.modules.Module
+            # TODO: check whether there is better way to check instance of \
+            #  torch.nn.quantized.modules.* and not torch.nn.modules.Module
+            """
+            Need to skip just Module. Only Operator/Tensor/Activation Needed
+            When just using 'isinstance', all of operator/tensor/activation belong to it
+            (All of them inherit torch.nn.modules.Module)
+            
+            Why '.nn.quantized.modules' instead of 'torch.nn.quantized.modules'?
+            On torch 1.7.0, the path is 'torch.nn.quantized.modules',
+            But on latest version, the path is 'torch.ao.nn.quantized.modules'
+            """
             if name == '' or str(type(mod)).find('.nn.quantized.modules') == -1:
                 continue
             if isinstance(mod, torch.nn.quantized.modules.linear.LinearPackedParams):
                 continue
 
-            if self.__input_dtype is None and (hasattr(mod, 'scale') and hasattr(mod, 'zero_point')):
+            if self.__input_dtype is None and hasattr(mod, 'scale') and hasattr(
+                    mod, 'zero_point'):
                 self.__input_dtype = mod.dtype
 
             if name in graph_data:
@@ -87,7 +108,7 @@ class TorchExtractor:
                 if str(type(mod)).find('.nn.quantized.modules') == -1:
                     continue
                 tensor_name = value_name[value_name.rfind(".") + 1:]
-                prefix = value_name[: value_name.rfind(".")]
+                prefix = value_name[:value_name.rfind(".")]
                 # for Linear
                 if prefix.find('_packed_params') != -1:
                     if tensor_name == '_packed_params':
@@ -95,14 +116,12 @@ class TorchExtractor:
                         data['bias'] = tensor[1]
                     continue
 
-                data[tensor_name] = TorchExtractor.permute(
-                    tensor)  # TODO: set it just permute, not TorchExtractor.permute
+                data[tensor_name] = TorchExtractor.permute(tensor)
 
     def __save_np(self, data):
         file_name = str(self.__np_idx) + ".npy"
         if data.shape == ():
             data = np.array([data])
-        #  python interpreter 64 may be uses float64 for default
         if data.dtype == np.dtype(np.float64):
             data = data.astype(np.float32)
         np.save(os.path.join(self.__dir_path, file_name), data)
@@ -117,8 +136,8 @@ class TorchExtractor:
             data['scale'] = self.__save_np(np.array(tensor.q_scale()))
             data['zerop'] = self.__save_np(np.array(tensor.q_zero_point()))
             data['quantized_dimension'] = 0
-        elif tensor.qscheme() in (
-                torch.per_channel_affine, torch.per_channel_symmetric, torch.per_channel_affine_float_qparams):
+        elif tensor.qscheme() in (torch.per_channel_affine, torch.per_channel_symmetric,
+                                  torch.per_channel_affine_float_qparams):
             data['scale'] = self.__save_np(tensor.q_per_channel_scales().numpy())
             data['zerop'] = self.__save_np(tensor.q_per_channel_zero_points().numpy())
             data['quantized_dimension'] = tensor.q_per_channel_axis()
@@ -130,7 +149,7 @@ class TorchExtractor:
         data['dtype'] = self.qdtype_mapping[tensor.dtype]['str']
         return data
 
-    def generate_files(self, mapping:None):
+    def generate_files(self, mapping: None):
         graph_data = self.__graph_data
         mapped_data = {}
         not_mapped_data = {}
@@ -181,7 +200,8 @@ class TorchExtractor:
                     data = not_mapped_data
 
                 if "bias" in layer:
-                    quantized_bias = quantize_tensor(layer['bias'], scale, zero_point, dtype=np.int32)
+                    quantized_bias = quantize_tensor(
+                        layer['bias'], scale, zero_point, dtype=np.int32)
                     data[b_name] = {
                         'scale': s_np,
                         'zerop': z_np,
@@ -213,6 +233,7 @@ class TorchExtractor:
         with open(self.__json_path, 'w') as json_file:
             json.dump(mapped_data, json_file)
         if len(not_mapped_data) > 0:
-            with open(os.path.join(self.__dir_path, 'not_mapped_' + self.__json_file_name), 'w') as json_file:
+            not_mapped_path = os.path.join(self.__dir_path,
+                                           'not_mapped_' + self.__json_file_name)
+            with open(not_mapped_path, 'w') as json_file:
                 json.dump(not_mapped_data, json_file)
-                

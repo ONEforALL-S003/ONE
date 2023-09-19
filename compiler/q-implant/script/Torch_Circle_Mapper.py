@@ -15,7 +15,6 @@
 import collections
 import copy
 import os
-import shutil
 import sys
 
 import numpy as np
@@ -40,8 +39,12 @@ class Torch2CircleMapper:
             tensor = tensor.permute(0, 2, 3, 1)
         return tensor
 
-    def __init__(self, original_model: torch.nn.Module, sample_input: torch.Tensor, dir_path: str,
-                 tflite2circle_path='./tflite2circle'):
+    def __init__(self,
+                 original_model: torch.nn.Module,
+                 sample_input: torch.Tensor,
+                 dir_path: str,
+                 tflite2circle_path='tflite2circle',
+                 clean_circle=True):
         self.__dir_path = dir_path
 
         self.__mapping = None
@@ -49,12 +52,11 @@ class Torch2CircleMapper:
         self.__network_input = None
         self.__network_output = None
 
-        if not os.path.exists(tflite2circle_path):
-            raise Exception('tflite2circle not exists')
         self.__tflite2circle_path = tflite2circle_path
         self.__original_model = original_model
         self.__sample_input = sample_input
         self.__partial_graph_data = collections.OrderedDict()
+        self.__clean_circle = clean_circle
 
     def get_mapped_dict(self):
         if self.__mapping is not None:
@@ -62,20 +64,25 @@ class Torch2CircleMapper:
         original_model = self.__original_model
         sample_input = self.__sample_input
         copied = False
-        tries = 0
+        tries = 1
 
         # When there are same tensor(same shape and shape value), collision occur and mapping fails
         # try to map with different tensor values (uniformly rand value)
         while True:
             try:
-                circle = Torch2Circle.toCircle(original_model, sample_input, self.__dir_path,
-                                               tflite2circle_path=self.__tflite2circle_path, clean_circle=False)
+                circle = Torch2Circle.toCircle(
+                    original_model,
+                    sample_input,
+                    self.__dir_path,
+                    tflite2circle_path=self.__tflite2circle_path,
+                    clean_circle=self.__clean_circle)
                 self.__generate_mapped_dict(circle)
                 break
             except Exception:
                 tries += 1
-                if tries >= 1:
+                if tries > 1:  # TODO: Change when re-try implemented
                     raise Exception('Failed to mapping')
+                # prevent the original model change
                 if not copied:
                     copied = True
                     original_model = copy.deepcopy(original_model)
@@ -104,11 +111,14 @@ class Torch2CircleMapper:
         # generate mapping data of original model's parameter
         for name, param in params:
             tensor = param.data
-            tensor = self.permute(tensor)  # permute tensor if needed(To make equivalent of circle's)
-            key = hash(tensor.numpy().tobytes())  # calculate hash value of binary numpy data
+            # permute tensor if needed(To make equivalent of circle's)
+            tensor = self.permute(tensor)
+            # calculate hash value of binary numpy data
+            key = hash(tensor.numpy().tobytes())
             if key in reverse_mapping:
                 raise Exception('Duplicate Tensors exist')
-            reverse_mapping[key] = name  # tensor hash value -> torch name
+            # tensor hash value -> torch name
+            reverse_mapping[key] = name
 
         self.__network_input = []
         for idx in range(circle.SubgraphsLength()):
@@ -136,6 +146,7 @@ class Torch2CircleMapper:
 
         if len(input_list) == 1 and len(self.__network_input) == 1:
             self.__mapping[input_list[0]] = self.__network_input[0].Name().decode('utf-8')
+        # Even there is no QuantStub, mapping works
         elif len(input_list) == 0:
             print("There are no QuantStub on the Network. Please check it manually")
         else:
@@ -146,12 +157,12 @@ class Torch2CircleMapper:
         # For operators those not have value
         op_mapping = {}
 
-        # get input tensor of graph
+        # get input tensors of graph
         for idx in range(graph.InputsLength()):
             input_tensor = graph.Tensors(graph.Inputs(idx))
             self.__network_input.append(input_tensor)
 
-        # get all of tensors from graph
+        # get all tensors from graph
         for idx in range(graph.TensorsLength()):
             tensor = graph.Tensors(idx)
             name = tensor.Name().decode('utf-8')
@@ -160,7 +171,7 @@ class Torch2CircleMapper:
             if shape.size == 0:
                 continue
             buffer = circle.Buffers(tensor.Buffer()).DataAsNumpy()
-            # When fetched buffer is not type of numpy or size is 0 => The tensor actually have no value
+            # When fetched buffer is not type of numpy or size is 0 -> The tensor actually have no value
             if type(buffer) is not np.ndarray or buffer.size == 0:
                 continue
             key = hash(buffer.tobytes())
@@ -178,9 +189,11 @@ class Torch2CircleMapper:
 
         # approximately it takes O(N^2)
         # we need to think to it better way or not
+        # TODO: maybe Trie will works. Check it whether it works or not
         for i in range(graph.OperatorsLength()):
             operator = graph.Operators(i)
-            input_set = set(operator.InputsAsNumpy().tolist())  # get operator's input tensor's indexes
+            # get operator's input tensor's indexes
+            input_set = set(operator.InputsAsNumpy().tolist())
 
             for op_name, op_input in op_mapping.items():
                 # When there is subset of already mapped tensor's indexes
@@ -191,7 +204,8 @@ class Torch2CircleMapper:
                     for tensor_idx in input_set:
                         tensor = graph.Tensors(tensor_idx)
                         tensor_name = tensor.Name().decode('utf-8')
-                        mapping[op_name] = tensor_name  # torch operator name -> circle operator name
+                        # torch operator name -> circle operator name
+                        mapping[op_name] = tensor_name
 
                     # can mapping output because it has only one!
                     if operator.OutputsLength() == 1:
