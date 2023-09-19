@@ -25,3 +25,4 @@ _model_ = Net_FC()
 
 # dummy input for onnx generation
 _dummy_ = torch.randn(2, 3)
+_qconfig_ = torch.quantization.get_default_qconfig('x86')

@@ -36,6 +36,7 @@ def check_operator(test:dict, compare:dict, test_path:str, compare_path:str):
     test_keys = test.keys()
     compare_keys = compare.keys()
 
+    # if keys are different, extraction
     if (test_keys & compare_keys) != test_keys:
         raise Exception
 
@@ -58,7 +59,6 @@ def check_operator(test:dict, compare:dict, test_path:str, compare_path:str):
             raise Exception
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='q-extract-torch test runner')
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         model = module._model_
         original_model = copy.deepcopy(model)
         model.eval()
-        model.qconfig = torch.quantization.get_default_qconfig('x86')
+        model.qconfig = module._qconfig_
         p_model = torch.quantization.prepare(model)
         quantized_model = torch.quantization.convert(p_model)
         testcase_dir = os.path.join(test_work_dir, testcase)

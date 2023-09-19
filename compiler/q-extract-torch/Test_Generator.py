@@ -43,7 +43,7 @@ for testcase in args.testcases:
     model = module._model_
     original_model = copy.deepcopy(model)
     model.eval()
-    model.qconfig = torch.quantization.get_default_qconfig('x86')
+    model.qconfig = module._qconfig_
     p_model = torch.quantization.prepare(model)
     quantized_model = torch.quantization.convert(p_model)
     current_test_dir = os.path.join(test_save_dir, testcase)
