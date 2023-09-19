@@ -19,17 +19,17 @@ import torch.nn
 import torch.quantization
 
 from Torch_Circle_Mapper import Torch2CircleMapper
-from TorchExtractor import TorchExtractor
+from Torch_Extractor import TorchExtractor
 
 
-# Helper class of PyTorch Quantization Parameter Export
-class TorchQParamExporter:
+# Helper class of PyTorch Quantization Parameter Extraction
+class TorchExtractHelper:
     @staticmethod
-    def export(original_model: torch.nn.Module,
-               quantized_model: torch.nn.Module,
-               sample_input: torch.tensor,
-               json_path: str,
-               tflite2circle_path='tflite2circle'):
+    def extract(original_model: torch.nn.Module,
+                quantized_model: torch.nn.Module,
+                sample_input: torch.tensor,
+                json_path: str,
+                tflite2circle_path='tflite2circle'):
         if original_model is None or not isinstance(original_model, torch.nn.Module):
             raise Exception("There is no original Pytorch Model")
         if quantized_model is None or not isinstance(quantized_model, torch.nn.Module):

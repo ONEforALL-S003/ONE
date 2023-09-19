@@ -59,7 +59,10 @@ class TorchExtractor:
         self.__np_idx = 0
         self.__input_dtype = None
         self.__graph_data = collections.OrderedDict()
-        self.__partial_graph_data = partial_graph_data
+        if partial_graph_data is None:
+            self.__partial_graph_data = collections.OrderedDict()
+        else:
+            self.__partial_graph_data = partial_graph_data
         self.__json_path = json_path
         self.__dir_path, self.__json_file_name = os.path.split(json_path)
         self.__extract_module(quantized_model)
@@ -87,6 +90,7 @@ class TorchExtractor:
                     self.__input_dtype = mod.dtype
                 continue
 
+            # get input's quantization type
             if self.__input_dtype is None and hasattr(mod, 'scale') and hasattr(
                     mod, 'zero_point') and hasattr(mod, 'dtype'):
                 self.__input_dtype = mod.dtype
@@ -104,7 +108,7 @@ class TorchExtractor:
                 if str(type(mod)).find('.nn.quantized.modules') == -1:
                     continue
                 tensor_name = value_name[value_name.rfind(".") + 1:]
-                prefix = value_name[:value_name.rfind(".")]
+                prefix = value_name[:value_name.rfind(".") + 1]
                 # for Linear
                 if prefix.find('_packed_params') != -1:
                     if tensor_name == '_packed_params':
@@ -112,6 +116,8 @@ class TorchExtractor:
                         data['bias'] = tensor[1]
                     continue
 
+                if self.__input_dtype is None and tensor_name == 'weight':
+                    self.__input_dtype = tensor.dtype
                 data[tensor_name] = TorchExtractor.permute(tensor)
 
     def __save_np(self, data):
@@ -226,8 +232,9 @@ class TorchExtractor:
                     'dtype': parent['dtype'],
                     'quantized_dimension': 0
                 }
-        with open(self.__json_path, 'w') as json_file:
-            json.dump(mapped_data, json_file)
+        if len(mapped_data) > 0:
+            with open(self.__json_path, 'w') as json_file:
+                json.dump(mapped_data, json_file)
         if len(not_mapped_data) > 0:
             not_mapped_path = os.path.join(self.__dir_path,
                                            'not_mapped_' + self.__json_file_name)
