@@ -7,6 +7,8 @@ TORCH_EXAMPLES_PATH="$1"; shift
 VIRTUALENV="$1"; shift
 TFLITE2CIRCLE_PATH="$1"; shift
 
+echo $TORCH_EXAMPLES_PATH
+ 
 TESTED=()
 PASSED=()
 FAILED=()
@@ -26,7 +28,6 @@ for TESTCASE in "$@"; do
     source "${VIRTUALENV}/bin/activate"
     "${VIRTUALENV}/bin/python" "${VERIFY_SCRIPT_PATH}" \
     --model "${TESTCASE}" \
-    --torch_dir "${TORCH_EXAMPLES_PATH}" \
     --output_dir "${TEST_RESULT_FILE}"
 
     if [[ $? -eq 0 ]]; then

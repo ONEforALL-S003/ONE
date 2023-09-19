@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import os
-import importlib
-import torch
 
 from test_utils import TestCase
 from test_utils import TestRunner
@@ -60,19 +58,10 @@ class Conv2D_000_Q8(TestCase):
 parser = argparse.ArgumentParser()
 parser.add_argument('--output_dir', type=str, required=True)
 parser.add_argument('--model', type=str, required=True)
-parser.add_argument('--torch_dir', type=str, required=True)
 args = parser.parse_args()
 
 output_dir = args.output_dir
 example = args.model
-
-module_path = os.path.join(args.torch_dir + '/examples.')
-
-module = importlib.import_module(module_path + example)
-
-output_folder = "./output/"
-# save .pth
-torch.save(module._model_, output_folder + example + ".pth")
 
 test_runner = TestRunner(output_dir)
 
