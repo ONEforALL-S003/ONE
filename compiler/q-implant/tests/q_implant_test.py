@@ -20,7 +20,7 @@ model = args.model
 
 module = importlib.import_module('import.' + model)
 
-input_circle = input_dir + '_000.circle'
+input_circle = input_dir + '.circle'
 output_circle = output_dir + f'/{module._name_}/output.circle'
 qparam_dir = output_dir + f'/{module._name_}/qparam.json'
 

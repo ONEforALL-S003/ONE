@@ -1,7 +1,7 @@
 from test_utils import TestCase
 from test_utils import gen_random_tensor
 
-class Conv2D_Q8(TestCase):
+class Conv2D_001_Q8(TestCase):
     def __init__(self):
         self.name = _name_
 
@@ -40,6 +40,6 @@ class Conv2D_Q8(TestCase):
 
         return json_content
 
-_name_ = 'Conv2D_Q8'
+_name_ = 'Conv2D_001_Q8'
 
-_model_ = Conv2D_Q8()
+_model_ = Conv2D_001_Q8()
