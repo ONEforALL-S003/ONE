@@ -5,7 +5,8 @@ import os
 import importlib
 
 from test_utils import TestRunner
-    
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_dir', type=str, required=True)
 parser.add_argument('--output_dir', type=str, required=True)
@@ -40,11 +41,7 @@ if not os.path.exists(qparam_dir):
     quit(255)
 
 # run q-implant
-subprocess.run(
-    [
-        driver, input_circle, qparam_dir, output_circle
-    ],
-    check=True)
+subprocess.run([driver, input_circle, qparam_dir, output_circle], check=True)
 
 if not os.path.exists(output_circle):
     print('output circle generate fail')

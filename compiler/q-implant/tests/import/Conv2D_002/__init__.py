@@ -1,6 +1,7 @@
 from test_utils import TestCase
 from test_utils import gen_random_tensor
 
+
 class Conv2D_002_Q8(TestCase):
     def __init__(self):
         self.name = _name_
@@ -39,6 +40,7 @@ class Conv2D_002_Q8(TestCase):
             0)  # quantized_dimension
 
         return json_content
+
 
 _name_ = 'Conv2D_002_Q8'
 
