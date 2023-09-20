@@ -7,8 +7,6 @@ WORKDIR="$1"; shift
 VIRTUALENV="$1"; shift
 INTERPRETER_DRIVER_PATH="$1"; shift
 
-echo $INTERPRETER_DRIVER_PATH
-
 TESTED=()
 PASSED=()
 FAILED=()
@@ -30,7 +28,8 @@ for TESTCASE in "$@"; do
     "${VIRTUALENV}/bin/python" "${VERIFY_SCRIPT_PATH}" \
     --model "${TESTCASE}" \
     --driver "${INTERPRETER_DRIVER_PATH}" \
-    --output "${TESTCASE_FILE}"
+    --output_dir "${BINDIR}" \
+    --input_dir "${TESTCASE_FILE}"
 
     if [[ $? -eq 0 ]]; then
       touch "${PASSED_TAG}"

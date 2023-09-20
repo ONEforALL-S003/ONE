@@ -47,26 +47,30 @@ class Conv2D_000_Q8(TestCase):
         return json_content
     
 parser = argparse.ArgumentParser()
-parser.add_argument('--output', type=str, required=True)
+parser.add_argument('--input_dir', type=str, required=True)
+parser.add_argument('--output_dir', type=str, required=True)
 parser.add_argument('--driver', type=str, required=True)
 parser.add_argument('--model', type=str, required=True)
 args = parser.parse_args()
 
-output = args.output
+input_dir = args.input_dir
+output_dir = args.output_dir
 driver = args.driver
 model = args.model
 
-output_dir = output + '.quant'
-input_circle = output + '.circle'
-output_circle = output + '.quant.circle'
+input_circle = input_dir + '.circle'
+output_circle = output_dir + '/Conv2D_000_Q8/output.circle'
+qparam_dir = output_dir + '/Conv2D_000_Q8/qparam.json'
+
+if not os.path.exists(input_circle):
+    print('fail to load input circle')
+    quit(255)
 
 test_runner = TestRunner(output_dir)
 
 test_runner.register(Conv2D_000_Q8())
 
 test_runner.run()
-
-qparam_dir = output_dir + '/Conv2D_000_Q8/qparam.json'
 
 if not os.path.exists(qparam_dir):
     print('qparam generate fail')
