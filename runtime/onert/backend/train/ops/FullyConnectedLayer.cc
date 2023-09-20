@@ -108,7 +108,7 @@ void FullyConnectedLayer::configure(const IPortableTensor *input, const IPortabl
 
 void FullyConnectedLayer::forward(bool) { cpu::ops::FullyConnectedLayer::run(); }
 
-void FullyConnectedLayer::backward(uint32_t)
+void FullyConnectedLayer::backward()
 {
   const auto data_type = _deriv_output->data_type();
   assert(data_type == _input->data_type());
@@ -117,7 +117,7 @@ void FullyConnectedLayer::backward(uint32_t)
     case OperandType::FLOAT32:
     {
       assert(data_type == _grad_weights->data_type());
-      assert(data_type == _grad_bias->data_type());
+      assert(_grad_bias == nullptr || data_type == _grad_bias->data_type());
       backwardFloat32();
       break;
     }

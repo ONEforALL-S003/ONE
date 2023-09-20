@@ -29,7 +29,9 @@ namespace nnfw
 namespace cker
 {
 class Conv;
-}
+struct ConvHybridTempArena;
+class Shape;
+} // namespace cker
 } // namespace nnfw
 
 namespace onert
@@ -48,13 +50,6 @@ public:
   ~ConvolutionLayer();
 
 public:
-  void convFloat32();
-
-  void convQ8uPerTensor();
-  void convQ8uPerChannel();
-
-  void convQ8i();
-
   void configure(const IPortableTensor *input, const IPortableTensor *kernel,
                  const IPortableTensor *bias, ir::PaddingType _paddingType,
                  const uint32_t paddingLeft, const uint32_t paddingRight, const uint32_t paddingTop,
@@ -62,10 +57,15 @@ public:
                  const uint32_t strideHeight, const uint32_t dilationWidthFactor,
                  const uint32_t dilationHeightFactor, const ir::Activation activation,
                  IPortableTensor *output);
-
+  void prepare() override;
   void run() override;
 
-  void prepare() override;
+private:
+  void convFloat32();
+  void convQ8uPerTensor();
+  void convQ8uPerChannel();
+  void convQ8i();
+  void convQ8iHybridPerChannel();
 
 private:
   const IPortableTensor *_input;
@@ -87,8 +87,10 @@ private:
   ir::Activation _activation;
 
   std::unique_ptr<nnfw::cker::Conv> _conv_kernel;
+  std::unique_ptr<nnfw::cker::ConvHybridTempArena> _hybrid_arena;
 
   bool _prepare;
+  bool _is_hybrid;
 };
 
 } // namespace ops

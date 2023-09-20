@@ -18,6 +18,7 @@
 #define __ONERT_EXEC_TRAIN_TRAINABLE_FN_SEQUENCE_H__
 
 #include "exec/train/ITrainableFunction.h"
+#include "exec/train/IGradientApplier.h"
 
 #include <memory>
 #include <vector>
@@ -29,18 +30,20 @@ namespace exec
 {
 namespace train
 {
-class TrainableFnSequence : public ITrainableFunction
+class TrainableFnSequence
 {
 public:
-  void forward(bool training) override;
-  void backward(uint32_t training_step) override;
+  void forward(bool training);
+  void backward(uint32_t training_step);
 
   void append(std::unique_ptr<ITrainableFunction> &&fn);
+  void append(std::unique_ptr<IGradientApplier> &&applier);
   void iterate(const std::function<void(ITrainableFunction &)> &fn);
 
 public:
   // TODO Change members
   std::vector<std::unique_ptr<ITrainableFunction>> _functions;
+  std::vector<std::unique_ptr<IGradientApplier>> _appliers;
 };
 } // namespace train
 } // namespace exec

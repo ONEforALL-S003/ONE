@@ -21,6 +21,7 @@
 #include <luci_interpreter/Interpreter.h>
 
 #include "MinMaxObserver.h"
+#include "MinMaxComputer.h"
 
 #include <memory>
 #include <thread>
@@ -35,35 +36,40 @@ using WholeOutput = std::vector<Output>;
 class RecordMinMax
 {
 public:
-  explicit RecordMinMax(uint32_t num_threads) : _threads_size(num_threads)
+  explicit RecordMinMax(uint32_t num_threads, std::unique_ptr<MinMaxComputer> &&minmax_computer)
+    : _threads_size(num_threads), _minmax_computer(std::move(minmax_computer))
   {
     assert(_threads_size > 0);
+    assert(_minmax_computer != nullptr);
   }
 
   ~RecordMinMax() = default;
 
   void initialize(const std::string &input_model_path);
 
-  void profileData(const std::string &mode, const std::string &input_data_path,
-                   float min_percentile, float max_percentile);
+  // TODO Refactor profile functions
+  void profileData(const std::string &input_data_path);
 
-  void profileDataInParallel(const std::string &mode, const std::string &input_data_path,
-                             float min_percentile, float max_percentile);
+  void profileDataInParallel(const std::string &input_data_path);
 
-  void profileRawData(const std::string &mode, const std::string &input_data_path,
-                      float min_percentile, float max_percentile);
+  void profileRawData(const std::string &input_data_path);
 
-  void profileRawDataDirectory(const std::string &mode, const std::string &input_data_path,
-                               float min_percentile, float max_percentile);
+  void profileRawDataDirectory(const std::string &input_data_path);
 
-  void profileDataWithRandomInputs(const std::string &mode, float min_percentile,
-                                   float max_percentile);
+  void profileDataWithRandomInputs(void);
 
   void saveModel(const std::string &output_model_path);
 
 private:
   luci_interpreter::Interpreter *getInterpreter() const { return _interpreters[0].get(); }
-  MinMaxObserver *getObserver() const { return _observers[0].get(); }
+
+  // Never return nullptr
+  MinMaxObserver *getObserver() const
+  {
+    assert(_observers.size() > 0); // FIX CALLER UNLESS
+    assert(_observers[0].get());   // FIX CALLER UNLESS
+    return _observers[0].get();
+  }
 
   WholeOutput importH5Data(const std::string &input_data_path);
 
@@ -74,6 +80,7 @@ private:
   std::vector<std::unique_ptr<MinMaxObserver>> _observers;
 
   uint32_t _threads_size = 0;
+  std::unique_ptr<MinMaxComputer> _minmax_computer;
 };
 
 } // namespace record_minmax

@@ -48,6 +48,10 @@ namespace compiler
 struct CompilerArtifact;
 class CompilerOptions;
 } // namespace compiler
+namespace odc
+{
+class QuantizeManager;
+} // namespace odc
 } // namespace onert
 
 struct nnfw_session
@@ -175,6 +179,10 @@ public:
   NNFW_STATUS train_export_circle(const char *path);
 #endif // ONERT_TRAIN
 
+  NNFW_STATUS set_quantization_type(NNFW_QUANTIZE_TYPE qtype);
+  NNFW_STATUS set_quantized_model_path(const char *path);
+  NNFW_STATUS quantize();
+
 private:
   const onert::ir::IGraph *primary_subgraph();
   uint32_t getInputSize();
@@ -203,6 +211,7 @@ private:
 #ifdef ONERT_TRAIN
   uint32_t _training_step{0};
 #endif // ONERT_TRAIN
+  std::unique_ptr<onert::odc::QuantizeManager> _quant_manager;
 };
 
 #endif // __API_NNFW_API_INTERNAL_H__

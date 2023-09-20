@@ -3,7 +3,11 @@ set(SOURCES
     "${LUCI_INTERPRETER_INCLUDE_DIR}/luci_interpreter/core/Tensor.h"
     RuntimeGraph.h
     RuntimeGraph.cpp
-    RuntimeModule.h)
+    RuntimeModule.h
+    TrainingGraph.cpp
+    GradientCalculationStorage.cpp
+    TrainableWeightStorage.cpp
+    TrainingModule.cpp)
 
 add_library(${LUCI_INTERPRETER_CORE} STATIC ${SOURCES})
 if (NOT NNCC_LIBRARY_NO_PIC)

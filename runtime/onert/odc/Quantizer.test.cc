@@ -14,29 +14,29 @@
  * limitations under the License.
  */
 
-#include "exec/train/optimizer/OptimizerCode.h"
+#include "Quantizer.h"
 
-#include <unordered_map>
+#include <gtest/gtest.h>
 
-namespace onert
-{
-namespace exec
-{
-namespace train
-{
-namespace optimizer
-{
+using namespace onert::odc;
 
-std::string toString(OptimizerCode code)
+// Test model input path is not set
+TEST(odc_Quantizer, neg_model_input_path)
 {
-  static const std::unordered_map<OptimizerCode, const char *> map{
-    {OptimizerCode::Invalid, "Invalid"},
-    {OptimizerCode::SGD, "SGD"},
-    {OptimizerCode::Adam, "Adam"}};
-  return map.at(code);
+  Quantizer quantizer;
+  ASSERT_THROW(quantizer.quantize(nullptr, "out", false), std::logic_error);
 }
 
-} // namespace optimizer
-} // namespace train
-} // namespace exec
-} // namespace onert
+// Test model output path is not set
+TEST(odc_Quantizer, neg_model_output_path)
+{
+  Quantizer quantizer;
+  ASSERT_NE(quantizer.quantize("in", nullptr, false), 0);
+}
+
+// Test invalid model input path
+TEST(odc_Quantizer, neg_invalid_model_input_path)
+{
+  Quantizer quantizer;
+  ASSERT_NE(quantizer.quantize("invalid_model_input_path.circle", "out", false), 0);
+}
