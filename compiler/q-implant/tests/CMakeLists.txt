@@ -10,8 +10,6 @@ endmacro(addeval)
 
 include("test.lst")
 
-set(TFLITE2CIRCLE_PATH $<TARGET_FILE:tflite2circle>)
-
 get_target_property(ARTIFACTS_BIN_PATH testDataGenerator BINARY_DIR)
 
 add_test(NAME q_implant_export_test
@@ -19,6 +17,6 @@ add_test(NAME q_implant_export_test
           "${CMAKE_CURRENT_BINARY_DIR}"
           "${ARTIFACTS_BIN_PATH}"
           "${NNCC_OVERLAY_DIR}/venv_2_12_1"
-          "${TFLITE2CIRCLE_PATH}"
+          "$<TARGET_FILE:q-implant>"
           ${Q_IMPLANT_TESTS}
 )

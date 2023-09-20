@@ -1,14 +1,14 @@
 #!/bin/bash
 
 VERIFY_SOURCE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERIFY_SCRIPT_PATH="${VERIFY_SOURCE_PATH}/gen_test_data.py"
+VERIFY_SCRIPT_PATH="${VERIFY_SOURCE_PATH}/q_implant_test.py"
 BINDIR="$1"; shift
-TORCH_EXAMPLES_PATH="$1"; shift
+WORKDIR="$1"; shift
 VIRTUALENV="$1"; shift
-TFLITE2CIRCLE_PATH="$1"; shift
+INTERPRETER_DRIVER_PATH="$1"; shift
 
-echo $TORCH_EXAMPLES_PATH
- 
+echo $INTERPRETER_DRIVER_PATH
+
 TESTED=()
 PASSED=()
 FAILED=()
@@ -16,6 +16,7 @@ FAILED=()
 for TESTCASE in "$@"; do
   TESTED+=("${TESTCASE}")
 
+  TESTCASE_FILE="${WORKDIR}/${TESTCASE}"
   TEST_RESULT_FILE="${BINDIR}/${TESTCASE}"
 
   PASSED_TAG="${TEST_RESULT_FILE}.passed"
@@ -28,7 +29,8 @@ for TESTCASE in "$@"; do
     source "${VIRTUALENV}/bin/activate"
     "${VIRTUALENV}/bin/python" "${VERIFY_SCRIPT_PATH}" \
     --model "${TESTCASE}" \
-    --output_dir "${TEST_RESULT_FILE}"
+    --driver "${INTERPRETER_DRIVER_PATH}" \
+    --output "${TESTCASE_FILE}"
 
     if [[ $? -eq 0 ]]; then
       touch "${PASSED_TAG}"
