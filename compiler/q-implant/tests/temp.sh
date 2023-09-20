@@ -11,7 +11,8 @@
 # tflite2circle_path : exporter needs to convert tflite to circle, include executable
 
 VERIFY_SOURCE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERIFY_SCRIPT_PATH="${VERIFY_SOURCE_PATH}/test.py"
+#VERIFY_SCRIPT_PATH="${VERIFY_SOURCE_PATH}/test.py"
+VERIFY_SCRIPT_PATH="${VERIFY_SOURCE_PATH}/output_circle_generate_test.py"
 BINDIR="$1"; shift
 VIRTUALENV="$1"; shift
 TFLITE2CIRCLE_PATH="$1"; shift
@@ -33,11 +34,8 @@ for TESTCASE in "$@"; do
   cat > "${TEST_RESULT_FILE}.log" <(
     exec 2>&1
     set -ex
-
     source "${VIRTUALENV}/bin/activate"
-
     "${VIRTUALENV}/bin/python" "${VERIFY_SCRIPT_PATH}"
-
     if [[ $? -eq 0 ]]; then
       touch "${PASSED_TAG}"
     fi
