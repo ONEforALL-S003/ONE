@@ -6,7 +6,6 @@ import importlib
 
 from test_utils import TestRunner
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_dir', type=str, required=True)
 parser.add_argument('--output_dir', type=str, required=True)
