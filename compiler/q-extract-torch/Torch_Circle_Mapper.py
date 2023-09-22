@@ -77,10 +77,10 @@ class Torch2CircleMapper:
                     clean=self.__clean)
                 self.__generate_mapped_dict(circle)
                 break
-            except Exception:
+            except Exception as ex:
                 tries += 1
                 if tries > 1:  # TODO: Change when re-try implemented
-                    raise Exception('Failed to mapping')
+                    raise Exception('Failed to mapping ' + str(ex))
                 # prevent the original model change
                 if not copied:
                     copied = True
@@ -102,10 +102,12 @@ class Torch2CircleMapper:
 
         if original_model is None or not isinstance(original_model, torch.nn.Module):
             raise Exception("There is no Pytorch Model for mapping")
-        if sample_input is None or not isinstance(sample_input, torch.Tensor):
+        if sample_input is None:
             raise Exception("Please give sample input to convert model")
 
         params = original_model.named_parameters()
+
+        tmp_param_name = []
 
         # generate mapping data of original model's parameter
         for name, param in params:
@@ -118,6 +120,7 @@ class Torch2CircleMapper:
                 raise Exception('Duplicate Tensors exist')
             # tensor hash value -> torch name
             reverse_mapping[key] = name
+            tmp_param_name.append(name)
 
         self.__network_input = []
         for idx in range(circle.SubgraphsLength()):
@@ -126,16 +129,17 @@ class Torch2CircleMapper:
         input_list = []
         output_list = []
         prev_module_name = None
+        tmp_names = []
         for name, mod in original_model.named_modules():
-            if name == '':  # it's just model itself
+            if name == '' or str(type(mod)).find('.nn.modules.container.') != -1:  # it's just model itself
                 continue
-            class_name = str(type(mod))
+            tmp_names.append(name)
             if isinstance(mod, torch.quantization.QuantStub):
                 input_list.append(name)
             elif isinstance(mod, torch.quantization.DeQuantStub):
                 output_list.append(name)
-            # TODO: find better way to check class in torch.nn.modules.activation package
-            elif class_name.find('activation') != -1:
+            # Operator which don't have tensors
+            elif len(mod.state_dict()) == 0:
                 # activation such as RELU, don't have tensor. So it can't be mapped
                 # use previous operator data to map it
                 if name not in self.__partial_graph_data:
@@ -161,8 +165,10 @@ class Torch2CircleMapper:
             input_tensor = graph.Tensors(graph.Inputs(idx))
             self.__network_input.append(input_tensor)
 
+        t = 0
         # get all tensors from graph
         for idx in range(graph.TensorsLength()):
+            t +=1
             tensor = graph.Tensors(idx)
             name = tensor.Name().decode('utf-8')
             shape = tensor.ShapeAsNumpy()
@@ -185,7 +191,7 @@ class Torch2CircleMapper:
                 if op_name not in op_mapping:
                     op_mapping[op_name] = set()
                 op_mapping[op_name].add(idx)
-
+        print(t)
         # approximately it takes O(N^2)
         # we need to think to it better way or not
         # TODO: maybe Trie will works. Check it whether it works or not

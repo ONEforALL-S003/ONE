@@ -72,6 +72,10 @@ class TorchExtractor:
     def __extract_module(self, module: torch.nn.Module):
         graph_data = self.__graph_data
         partial_graph_data = self.__partial_graph_data
+
+        if len(module.state_dict()) == 0:
+            raise Exception('There is no internal tensor in network')
+
         # Restructuring Neural Network model
         for name, mod in module.named_modules():
             # TODO: check whether there is better way to check instance of \
@@ -118,8 +122,13 @@ class TorchExtractor:
                         data['bias'] = tensor[1]
                     continue
 
+                # eg. bias None
+                if tensor is None:
+                    continue
+
                 if self.__input_dtype is None and tensor_name == 'weight':
                     self.__input_dtype = tensor.dtype
+
                 data[tensor_name] = TorchExtractor.permute(tensor)
 
     def __save_np(self, data):
@@ -163,6 +172,9 @@ class TorchExtractor:
         # method should work even there is no mapping data => all data will be not_mapped_data
         if mapping is None:
             mapping = {}
+
+        if self.__input_dtype is None:
+            raise Exception('Check network(torch model) have have tensor internally')
 
         for name, layer in graph_data.items():
             dtype = self.qdtype_mapping[self.__input_dtype]['str']

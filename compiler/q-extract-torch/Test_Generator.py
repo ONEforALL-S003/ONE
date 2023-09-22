@@ -19,6 +19,7 @@ import torch
 
 import importlib
 import argparse
+import torch.backends.quantized
 
 from Torch_Circle_Mapper import Torch2CircleMapper
 from Torch_Extractor import TorchExtractor
@@ -38,32 +39,49 @@ if not os.path.exists(test_save_dir):
 
 test_mapping_dirs = ['with_mapping', 'without_mapping']
 
+success = []
+fails = []
 for testcase in args.testcases:
-    module = importlib.import_module('test.example.' + testcase)
-    model = module._model_
-    original_model = copy.deepcopy(model)
-    model.eval()
-    model.qconfig = module._qconfig_
-    p_model = torch.quantization.prepare(model)
-    quantized_model = torch.quantization.convert(p_model)
-    current_test_dir = os.path.join(test_save_dir, testcase)
-    mapper = Torch2CircleMapper(
-        original_model=original_model,
-        sample_input=module._dummy_,
-        dir_path=current_test_dir,
-        tflite2circle_path='./tflite2circle',
-        clean=False)
+    try:
+        module = importlib.import_module('test.example.' + testcase)
+        model = module._model_
+        original_model = copy.deepcopy(model)
+        model.eval()
 
-    test_mapped_data = [
-        # {mapping, partial_graph_data}
-        mapper.get_mapped_dict(),
-        [None, None]
-    ]
+        if hasattr(module, '_qengine_'):
+            torch.backends.quantized.engine = module._qengine_
 
-    for i in range(2):
-        json_path = current_test_dir + os.sep + test_mapping_dirs[i] + os.sep + 'qparm.json'
-        extractor = TorchExtractor(
-            quantized_model=quantized_model,
-            json_path=json_path,
-            partial_graph_data=test_mapped_data[i][1])
-        extractor.generate_files(test_mapped_data[i][0])
+        if hasattr(module, '_qconfig_'):
+            model.qconfig = module._qconfig_
+        else:
+            model.qconfig = torch.quantization.get_default_qconfig()
+        p_model = torch.quantization.prepare(model)
+        quantized_model = torch.quantization.convert(p_model)
+        current_test_dir = os.path.join(test_save_dir, testcase)
+        mapper = Torch2CircleMapper(
+            original_model=original_model,
+            sample_input=module._dummy_,
+            dir_path=current_test_dir,
+            tflite2circle_path='./tflite2circle',
+            clean=False)
+
+        test_mapped_data = [
+            # {mapping, partial_graph_data}
+            mapper.get_mapped_dict(),
+            [None, None]
+        ]
+
+        for i in range(2):
+            json_path = current_test_dir + os.sep + test_mapping_dirs[i] + os.sep + 'qparm.json'
+            extractor = TorchExtractor(
+                quantized_model=quantized_model,
+                json_path=json_path,
+                partial_graph_data=test_mapped_data[i][1])
+            extractor.generate_files(test_mapped_data[i][0])
+        success.append(testcase)
+    except Exception as ex:
+        fails.append([testcase, ex])
+
+print(success)
+for testcase, reason in fails:
+    print(testcase, reason)

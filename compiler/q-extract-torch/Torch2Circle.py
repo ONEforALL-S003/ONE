@@ -55,12 +55,16 @@ class Torch2Circle:
 
     @staticmethod
     def __toOnnx(torch_model: torch.nn.Module, sample_input: torch.Tensor, dir_path: str):
-        onnx_path = os.path.join(dir_path, "tmp.onnx")
-        torch.onnx.export(torch_model, sample_input, onnx_path, opset_version=9)
-        onnx_model = onnx.load(onnx_path)
-        onnx.checker.check_model(onnx_model)
-        inferred_model = onnx.shape_inference.infer_shapes(onnx_model)
-        onnx.checker.check_model(inferred_model)
+        try:
+            onnx_path = os.path.join(dir_path, "tmp.onnx")
+            torch.onnx.export(torch_model, sample_input, onnx_path, opset_version=15)
+            onnx_model = onnx.load(onnx_path)
+            onnx.checker.check_model(onnx_model)
+            inferred_model = onnx.shape_inference.infer_shapes(onnx_model)
+            onnx.checker.check_model(inferred_model)
+        except Exception as ex:
+            raise Exception('Fail to convert onnx. ' + str(ex))
+
         return inferred_model
 
     @staticmethod

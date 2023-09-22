@@ -29,7 +29,7 @@ class TorchExtractHelper:
                 quantized_model: torch.nn.Module,
                 sample_input: torch.tensor,
                 json_path: str,
-                tflite2circle_path='tflite2circle'):
+                tflite2circle_path='tflite2circle', clean=True):
         if original_model is None or not isinstance(original_model, torch.nn.Module):
             raise Exception("There is no original Pytorch Model")
         if quantized_model is None or not isinstance(quantized_model, torch.nn.Module):
@@ -44,7 +44,7 @@ class TorchExtractHelper:
             sample_input=sample_input,
             dir_path=dir_path,
             tflite2circle_path=tflite2circle_path,
-            clean_circle=False)
+            clean=clean)
         mapping, partial_graph_data = mapper.get_mapped_dict()
         extractor = TorchExtractor(
             quantized_model=quantized_model,
