@@ -20,6 +20,7 @@
 #include <luci/CircleExporter.h>
 #include <luci/CircleFileExpContract.h>
 #include <luci/UserSettings.h>
+#include <luci/IR/CircleNode.h>
 #include <loco.h>
 
 #include <npy.hpp>
