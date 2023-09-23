@@ -136,6 +136,10 @@ int entry(int argc, char **argv)
     return EXIT_FAILURE;
   }
 
+  const auto input_path = std::string(argv[1]);
+  const auto qparams_path = std::string(argv[2]);
+  const auto output_path = std::string(argv[3]);
+
   luci::ImporterEx importerex;
 
   // Load input model from the file
@@ -144,7 +148,6 @@ int entry(int argc, char **argv)
     return EXIT_FAILURE;
 
   // open json
-  const auto qparams_path = std::string(argv[2]);
   const auto root = load_json(qparams_path);
   THROW_UNLESS(root.isObject());
   const auto dir_path = directory_path(qparams_path);
