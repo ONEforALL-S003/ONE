@@ -168,7 +168,7 @@ int entry(int argc, char **argv)
     return EXIT_FAILURE;
   }
 
-  for (size_t idx = 0; idx < module->size(); ++idx)
+  for (size_t idx = 0; idx < output_module->size(); ++idx)
   {
     auto input_graph = input_module->graph(idx);
     auto output_graph = output_module->graph(idx);
