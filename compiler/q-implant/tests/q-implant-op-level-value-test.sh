@@ -2,7 +2,7 @@
 
 BINDIR="$1"; shift
 WORKDIR="$1"; shift
-TEST_DRIVER_PATH="${BINDIR}/test_driver"
+TEST_DRIVER_PATH="${BINDIR}/test-driver"
 TEST_RESULT_DIR="${BINDIR}/result"
 
 TESTED=()
