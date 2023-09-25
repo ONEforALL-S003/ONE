@@ -123,7 +123,7 @@ bool check_dtype(loco::Graph *g)
   return PASSED;
 }
 
-bool check_value(loco::Graph *input, loco::Graph *output, Json::Value *qparam, const std::string &dir_path)
+bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qparam, const std::string &dir_path)
 {
   std::unordered_map<std::string, luci::CircleNode *> map_input;
   std::unordered_map<std::string, luci::CircleNode *> map_output;
