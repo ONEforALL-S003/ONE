@@ -22,10 +22,7 @@ for TESTCASE in "$@"; do
     exec 2>&1
     set -ex
 
-    "${TEST_DRIVER_PATH}" \
-    "${TESTCASE_FILE}.circle" \
-    "${BINDIR}/${TESTCASE}_Q8/qparam.json" \
-    "${BINDIR}/${TESTCASE}_Q8/output.circle"
+    "${TEST_DRIVER_PATH}" "${TESTCASE_FILE}.circle" "${BINDIR}/${TESTCASE}_Q8/qparam.json" "${BINDIR}/${TESTCASE}_Q8/output.circle"
 
     if [[ $? -eq 0 ]]; then
       touch "${PASSED_TAG}"
