@@ -107,10 +107,10 @@ Json::Value load_json(const std::string &path)
   return root;
 }
 
-bool check_dtype(loco::Graph *g)
-{
 #define PASSED 1
 #define FAILED 0
+bool check_dtype(loco::Graph *g)
+{
   for (auto node : loco::active_nodes(loco::output_nodes(g)))
   {
     auto circle_node = loco::must_cast<luci::CircleNode *>(node);
@@ -121,10 +121,53 @@ bool check_dtype(loco::Graph *g)
       return FAILED;
   }
   return PASSED;
-#undef PASSED
-#undef FAILED
 }
 
+bool check_value(loco::Graph *input, loco::Graph *output, Json::Value *qparam, const std::string &dir_path)
+{
+  std::unordered_map<std::string, luci::CircleNode *> map_input;
+  std::unordered_map<std::string, luci::CircleNode *> map_output;
+
+  for (auto node : loco::all_nodes(input))
+  {
+    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
+    if (circle_node->opcode() == luci::CircleOpcode::CIRCLEOUTPUT)
+    {
+      continue;
+    }
+
+    input_map[circle_node->name()] = circle_node;
+  }
+  for (auto node : loco::all_nodes(output))
+  {
+    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
+    if (circle_node->opcode() == luci::CircleOpcode::CIRCLEOUTPUT)
+    {
+      continue;
+    }
+
+    output_map[circle_node->name()] = circle_node;
+  }
+  for (const auto tensor_name : root.getMemberNames())
+  {
+    const auto tensor = root[tensor_name];
+
+    verify_tensor(tensor);
+
+    const auto scale_path = dir_path + '/' + tensor["scale"].asString();
+    const auto zerop_path = dir_path + '/' + tensor["zerop"].asString();
+    const auto quantized_dimension = tensor["quantized_dimension"].asUInt();
+    const auto dtype = str_to_dtype(tensor["dtype"].asString());
+
+    auto input_node = map_input.at(tensor_name);
+    auto output_node = map_output.at(tensor_name);
+
+  }
+
+  return PASSED;
+}
+#undef PASSED
+#undef FAILED
 } // namespace
 
 int entry(int argc, char **argv)
@@ -180,6 +223,11 @@ int entry(int argc, char **argv)
     }
     
     // TODO: check values of output graph
+    if (!check_value(input_graph, output_graph, root, dir_path))
+    {
+      std::cerr << "ERROR: Tensor value is wrong!" << std::endl;
+      return EXIT_FAILURE;
+    }
   }
 
   std::cout << "[TEST PASSED]" << std::endl;
