@@ -123,7 +123,8 @@ bool check_dtype(loco::Graph *g)
   return PASSED;
 }
 
-bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qparam, const std::string &dir_path)
+bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qparam,
+                 const std::string &dir_path)
 {
   std::unordered_map<std::string, luci::CircleNode *> map_input;
   std::unordered_map<std::string, luci::CircleNode *> map_output;
@@ -161,7 +162,6 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
 
     auto input_node = map_input.at(tensor_name);
     auto output_node = map_output.at(tensor_name);
-
   }
 
   return PASSED;
@@ -194,7 +194,7 @@ int entry(int argc, char **argv)
   const auto root = load_json(qparams_path);
   THROW_UNLESS(root.isObject());
   const auto dir_path = directory_path(qparams_path);
-  
+
   // Load output model from the file
   auto output_module = importerex.importVerifyModule(output_path);
   if (output_module.get() == nullptr)
@@ -221,7 +221,7 @@ int entry(int argc, char **argv)
       std::cerr << "ERROR: Quantized tensor type is not int type!" << std::endl;
       return EXIT_FAILURE;
     }
-    
+
     // TODO: check values of output graph
     if (!check_value(input_graph, output_graph, root, dir_path))
     {
