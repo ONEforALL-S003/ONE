@@ -136,7 +136,7 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
       continue;
     }
 
-    input_map[circle_node->name()] = circle_node;
+    map_input[circle_node->name()] = circle_node;
   }
   for (auto node : loco::all_nodes(output))
   {
@@ -146,11 +146,11 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
       continue;
     }
 
-    output_map[circle_node->name()] = circle_node;
+    map_output[circle_node->name()] = circle_node;
   }
-  for (const auto tensor_name : root.getMemberNames())
+  for (const auto tensor_name : qparam.getMemberNames())
   {
-    const auto tensor = root[tensor_name];
+    const auto tensor = qparam[tensor_name];
 
     verify_tensor(tensor);
 
