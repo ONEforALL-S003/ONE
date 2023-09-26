@@ -9,14 +9,14 @@ class Add_001_Q8(TestCase):
     def generate(self) -> dict:
         json_content = dict()
 
-        # Generate ifm
+        # Generate ifm1
         json_content['ifm1'] = gen_random_tensor(
             "uint8",  # dtype_str
             (1),  # scale_shape
             (1),  # zerop_shape
             0)  # quantized_dimension
 
-        # Generate ker
+        # Generate ifm2
         json_content['ifm2'] = gen_random_tensor(
             "uint8",  #dtype_str
             (1),  # scale_shape
