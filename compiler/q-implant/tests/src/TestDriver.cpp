@@ -121,7 +121,8 @@ bool check_dtype(loco::Graph *g)
   return EXIT_SUCCESS;
 }
 
-bool check_scale(luci::CircleNode* input_node, luci::CircleNode* output_node, const std::string &scale_path)
+bool check_scale(luci::CircleNode *input_node, luci::CircleNode *output_node,
+                 const std::string &scale_path)
 {
   std::vector<unsigned long> shape;
   bool fortran_order;
@@ -140,7 +141,8 @@ bool check_scale(luci::CircleNode* input_node, luci::CircleNode* output_node, co
   return EXIT_SUCCESS;
 }
 
-bool check_zerop(luci::CircleNode* input_node, luci::CircleNode* output_node, const std::string &zerop_path)
+bool check_zerop(luci::CircleNode *input_node, luci::CircleNode *output_node,
+                 const std::string &zerop_path)
 {
   std::vector<unsigned long> shape;
   bool fortran_order;
