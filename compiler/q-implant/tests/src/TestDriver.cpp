@@ -174,7 +174,7 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
 
       for (int i = 0; i < shape[0]; ++i)
       {
-        if (std::abs(output_node->quantparam()->scale[i] - scale[i]) > 1e-7) 
+        if (std::abs(output_node->quantparam()->scale[i] - scale[i]) > 1e-7)
         {
           std::cerr << "scale parameter of output is different from qparams!" << std::endl;
           return EXIT_FAILURE;
