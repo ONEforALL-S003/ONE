@@ -121,6 +121,44 @@ bool check_dtype(loco::Graph *g)
   return EXIT_SUCCESS;
 }
 
+bool check_scale(luci::CircleNode* input_node, luci::CircleNode* output_node, const std::string &scale_path)
+{
+  std::vector<unsigned long> shape;
+  bool fortran_order;
+  std::vector<float> scale;
+  npy::LoadArrayFromNumpy(scale_path, shape, fortran_order, scale);
+
+  THROW_UNLESS(shape.size() == 1);
+  THROW_UNLESS(output_node->quantparam()->scale.size() == shape[0]);
+  THROW_UNLESS(fortran_order == false);
+
+  for (int i = 0; i < shape[0]; ++i)
+  {
+    if (std::abs(output_node->quantparam()->scale[i] - scale[i]) > 1e-7)
+      return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
+}
+
+bool check_zerop(luci::CircleNode* input_node, luci::CircleNode* output_node, const std::string &zerop_path)
+{
+  std::vector<unsigned long> shape;
+  bool fortran_order;
+  std::vector<int64_t> zerop;
+  npy::LoadArrayFromNumpy(zerop_path, shape, fortran_order, zerop);
+
+  THROW_UNLESS(shape.size() == 1);
+  THROW_UNLESS(output_node->quantparam()->zerop.size() == shape[0]);
+  THROW_UNLESS(fortran_order == false);
+
+  for (int i = 0; i < shape[0]; ++i)
+  {
+    if (output_node->quantparam()->zerop[i] != zerop[i])
+      return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
+}
+
 bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qparam,
                  const std::string &dir_path)
 {
@@ -162,24 +200,17 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
     auto output_node = map_output.at(tensor_name);
 
     // check scale
+    if (check_scale(input_node, output_node, scale_path))
     {
-      std::vector<unsigned long> shape;
-      bool fortran_order;
-      std::vector<float> scale;
-      npy::LoadArrayFromNumpy(scale_path, shape, fortran_order, scale);
+      std::cerr << "scale parameter of output is different from qparams!" << std::endl;
+      return EXIT_FAILURE;
+    }
 
-      THROW_UNLESS(shape.size() == 1);
-      THROW_UNLESS(output_node->quantparam()->scale.size() == shape[0]);
-      THROW_UNLESS(fortran_order == false);
-
-      for (int i = 0; i < shape[0]; ++i)
-      {
-        if (std::abs(output_node->quantparam()->scale[i] - scale[i]) > 1e-7)
-        {
-          std::cerr << "scale parameter of output is different from qparams!" << std::endl;
-          return EXIT_FAILURE;
-        }
-      }
+    // check zerop
+    if (check_zerop(input_node, output_node, zerop_path))
+    {
+      std::cerr << "zero point parameter of output is different from qparams!" << std::endl;
+      return EXIT_FAILURE;
     }
   }
 
