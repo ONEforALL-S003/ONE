@@ -107,8 +107,6 @@ Json::Value load_json(const std::string &path)
   return root;
 }
 
-#define PASSED 1
-#define FAILED 0
 bool check_dtype(loco::Graph *g)
 {
   for (auto node : loco::active_nodes(loco::output_nodes(g)))
@@ -118,9 +116,9 @@ bool check_dtype(loco::Graph *g)
     // Throw an exception if dtype is not float32
     // TODO Operator-level verification (ex: using QuantizedModelVerifier)
     if (circle_node->dtype() == loco::DataType::FLOAT32)
-      return FAILED;
+      return EXIT_FAILURE;
   }
-  return PASSED;
+  return EXIT_SUCCESS;
 }
 
 bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qparam,
@@ -162,12 +160,32 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
 
     auto input_node = map_input.at(tensor_name);
     auto output_node = map_output.at(tensor_name);
+
+    // check scale
+    {
+      std::vector<unsigned long> shape;
+      bool fortran_order;
+      std::vector<float> scale;
+      npy::LoodArrayFromNumpy(scale_path, shape, fortran_order, scale);
+
+      THROW_UNLESS(shape.size() == 1);
+      THROW_UNLESS(output_node->quantparam()->scale.size() == shape[0]);
+      THROW_UNLESS(fortran_order == false);
+
+      for (int i = 0; i < shape[0]; ++i)
+      {
+        if (std::abs(output_node->quantparam()->scale[i] - scale[i]) > 1e-7) 
+        {
+          std::cerr << "scale parameter of output is different from qparams!" << std::endl;
+          return EXIT_FAILURE;
+        }
+      }
+    }
   }
 
-  return PASSED;
+  return EXIT_SUCCESS;
 }
-#undef PASSED
-#undef FAILED
+
 } // namespace
 
 int entry(int argc, char **argv)
@@ -216,14 +234,14 @@ int entry(int argc, char **argv)
     auto input_graph = input_module->graph(idx);
     auto output_graph = output_module->graph(idx);
 
-    if (!check_dtype(output_graph))
+    if (check_dtype(output_graph))
     {
       std::cerr << "ERROR: Quantized tensor type is not int type!" << std::endl;
       return EXIT_FAILURE;
     }
 
     // TODO: check values of output graph
-    if (!check_value(input_graph, output_graph, root, dir_path))
+    if (check_value(input_graph, output_graph, root, dir_path))
     {
       std::cerr << "ERROR: Tensor value is wrong!" << std::endl;
       return EXIT_FAILURE;
