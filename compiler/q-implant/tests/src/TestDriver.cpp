@@ -166,7 +166,7 @@ bool check_value(loco::Graph *input, loco::Graph *output, const Json::Value &qpa
       std::vector<unsigned long> shape;
       bool fortran_order;
       std::vector<float> scale;
-      npy::LoodArrayFromNumpy(scale_path, shape, fortran_order, scale);
+      npy::LoadArrayFromNumpy(scale_path, shape, fortran_order, scale);
 
       THROW_UNLESS(shape.size() == 1);
       THROW_UNLESS(output_node->quantparam()->scale.size() == shape[0]);
