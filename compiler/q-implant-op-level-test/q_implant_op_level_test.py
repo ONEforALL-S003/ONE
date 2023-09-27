@@ -57,7 +57,7 @@ if not os.path.exists(h5_path):
     print('h5 dump failed')
     quit(255)
 
-if not validate(h5_path):
+if not validate(h5_path, output_dir + f'/{module._name_}', qparam_dir):
     quit(255)
 
 quit(0)

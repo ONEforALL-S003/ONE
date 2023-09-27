@@ -7,13 +7,15 @@ import json
 import sys
 
 
-def validate(h5_path, qparam_dir):
-    with open(qparam_dir, "r") as qparams:
+def validate(h5_path, qparam_dir, qparam_json):
+    with open(qparam_json, "r") as qparams:
         json_load = json.load(qparams)
     with h5.File(h5_path, "r") as model:
-        for tensor_name in model.keys():
-            print(tensor_name)
-            pass
+        for node_name in model.keys():
+            print(node_name)
+            for tensor_name in json_load[node_name]:
+                print(node_name)
+
 
 def compare_quantization(tensor, tensor_name, expect_dir):
     global failed_cases
