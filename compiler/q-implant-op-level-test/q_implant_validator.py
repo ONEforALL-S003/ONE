@@ -13,6 +13,10 @@ def validate(h5_path, qparam_dir, qparam_json):
         json_load = json.load(qparams)
     with h5.File(h5_path, "r") as model:
         for node_name in model.keys():
+            # not quantized node exists (reshape, pad...)
+            if not json_load.get(node_name):
+                continue
+
             for tensor_name in json_load[node_name]:
                 np_path = f"{qparam_dir}/{json_load[node_name][tensor_name]}"
                 if tensor_name == "value":
