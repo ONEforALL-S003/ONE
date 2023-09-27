@@ -26,7 +26,7 @@ module = importlib.import_module('import.' + model)
 input_circle = input_dir + '.circle'
 output_circle = output_dir + f'/{module._name_}/output.circle'
 qparam_dir = output_dir + f'/{module._name_}/qparam.json'
-h5_dir = output_dir + f'/{module._name}/output.h5'
+h5_dir = output_dir + f'/{module._name_}/output.h5'
 
 if not os.path.exists(input_circle):
     print('fail to load input circle')
