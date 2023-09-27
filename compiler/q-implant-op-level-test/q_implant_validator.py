@@ -8,7 +8,7 @@ import sys
 
 
 def validate(h5_path, qparam_dir, qparam_json):
-    flag = True
+    valid = True
     with open(qparam_json, "r") as qparams:
         json_load = json.load(qparams)
     with h5.File(h5_path, "r") as model:
@@ -21,60 +21,28 @@ def validate(h5_path, qparam_dir, qparam_json):
                 np_path = f"{qparam_dir}/{json_load[node_name][tensor_name]}"
                 if tensor_name == "value":
                     expected_weights = np.load(np_path)
-                    h5_weights = model[node_name]["weights"]
+                    h5_weights = model[node_name]["weights"][:]
                     if np.allclose(h5_weights, expected_weights, rtol=1.e-5, atol=1.e-5) == False:
                         print("Implanted weights of " + node_name + "." + tensor_name + " (" + str(h5_weights) +
                             ") do not match with expected value (" + str(expected_weights) + ").")
-                        flag = False
+                        valid = False
 
                 if tensor_name == "scale":
                     expected_scale = np.load(np_path)
-                    h5_scale = model[node_name]["scale"]
+                    h5_scale = model[node_name]["scale"][:]
                     if np.allclose(h5_scale, expected_scale, rtol=1.e-5, atol=1.e-5) == False:
                         print("Implanted scale of " + node_name + "." + tensor_name + " (" + str(h5_scale) +
                             ") do not match with expected value (" + str(expected_scale) + ").")
-                        flag = False
+                        valid = False
 
-                
+                if tensor_name == "zerop":
+                    expected_zerop = np.load(np_path)
+                    input_zerop = model[node_name]["zero_point"][:]
+                    if np.allclose(
+                            input_zerop, expected_zerop, rtol=0, atol=1) == False:
+                        print("Implanted zero point of " + tensor_name + " (" +
+                            str(input_zerop) + ") do not match with expected value (" +
+                            str(expected_zerop) + ").")
+                        valid = False
 
-    return flag
-
-
-
-def compare_quantization(tensor, tensor_name, expect_dir):
-    global failed_cases
-    with open(expect_dir + "/" + tensor_name + ".json", "r") as expect_file:
-        json_load = json.load(expect_file)
-    for key in json_load:
-        if key == "weights":
-            expected_weights = np.array(json_load["weights"])
-            input_weights = tensor["weights"][()]
-            abs_tolerance = 1
-            # We use higher tolerance for int64 data (bias of int16-quantized model)
-            if tensor["weights"].dtype == 'int64':
-                abs_tolerance = 5
-
-            if np.allclose(
-                    input_weights, expected_weights, rtol=0, atol=abs_tolerance) == False:
-                print("Quantized weights of " + tensor_name + " (" + str(input_weights) +
-                      ") do not match with expected value (" + str(expected_weights) +
-                      ").")
-                failed_cases += 1
-
-        if key == "scale":
-            expected_scale = np.array(json_load["scale"])
-            input_scale = tensor["scale"][:]
-            if np.allclose(input_scale, expected_scale, rtol=1.e-5, atol=1.e-5) == False:
-                print("Quantized scale of " + tensor_name + " (" + str(input_scale) +
-                      ") do not match with expected value (" + str(expected_scale) + ").")
-                failed_cases += 1
-
-        if key == "zero_point":
-            expected_zero_point = np.array(json_load["zero_point"])
-            input_zero_point = tensor["zero_point"][:]
-            if np.allclose(
-                    input_zero_point, expected_zero_point, rtol=0, atol=1) == False:
-                print("Quantized zero_point of " + tensor_name + " (" +
-                      str(input_zero_point) + ") do not match with expected value (" +
-                      str(expected_zero_point) + ").")
-                failed_cases += 1
+    return valid
