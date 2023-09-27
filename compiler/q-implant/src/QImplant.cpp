@@ -32,11 +32,6 @@ using namespace q_implant;
 
 namespace
 {
-// TODO: Find opcodes which can be appended in conversion
-std::set<luci::CircleOpcode> appendable_operator_opcode{
-  luci::CircleOpcode::CONCATENATION, luci::CircleOpcode::RESHAPE, luci::CircleOpcode::SPLIT,
-  luci::CircleOpcode::TRANSPOSE};
-
 // Return directory path of given file path
 // TODO Find a platform-independent way to do this
 std::string directory_path(const std::string &file_path)
@@ -107,8 +102,6 @@ Json::Value load_json(const std::string &path)
 
 void set_dtype(luci::CircleNode *node, loco::DataType dtype) { node->dtype(dtype); }
 
-void set_dtype(luci::CircleNode *origin, luci::CircleNode *dest) { dest->dtype(origin->dtype()); }
-
 void set_scale(luci::CircleNode *node, const std::string &scale_path)
 {
   assert(node);               // FIX CALLER UNLESS
@@ -149,18 +142,19 @@ void set_quantized_dimension(luci::CircleNode *node, const uint32_t quantized_di
   node->quantparam()->quantized_dimension = quantized_dimension;
 }
 
-void set_quantparam(luci::CircleNode *origin, luci::CircleNode *dest)
+void copy_quantparam(luci::CircleNode *src, luci::CircleNode *dest)
 {
-  assert(origin);
-  auto origin_quantparam = origin->quantparam();
-  assert(origin_quantparam);
+  assert(src);
+  auto src_quantparam = src->quantparam();
+  assert(src_quantparam);
 
   assert(dest);
+  dest->quantparam(std::make_unique<luci::CircleQuantParam>());
   auto dest_quantparam = dest->quantparam();
-  assert(dest_quantparam);
-  dest_quantparam->zerop = origin_quantparam->zerop;
-  dest_quantparam->scale = origin_quantparam->scale;
-  dest_quantparam->quantized_dimension = origin_quantparam->quantized_dimension;
+  dest_quantparam->zerop = src_quantparam->zerop;
+  dest_quantparam->scale = src_quantparam->scale;
+  dest_quantparam->quantized_dimension = src_quantparam->quantized_dimension;
+  set_dtype(dest, src->dtype());
 }
 
 template <loco::DataType DT> void set_value(luci::CircleConst *node, const std::string &value_path)
@@ -271,49 +265,7 @@ void QImplant::write(loco::Graph *g)
     }
   }
 
-  std::set<luci::CircleNode *> visit;
-  std::deque<luci::CircleNode *> que;
-  for (auto input_node : loco::input_nodes(g))
-  {
-    auto node = loco::must_cast<luci::CircleNode *>(input_node);
-    que.emplace_back(node);
-  }
-
-  // check whether node can share its successor node quantization parameter
-  while (!que.empty())
-  {
-    auto node = que.front();
-    que.pop_front();
-
-    // skip when node is output
-    if (node->opcode() == luci::CircleOpcode::CIRCLEOUTPUT)
-    {
-      continue;
-    }
-
-    auto quantparam = node->quantparam();
-    THROW_UNLESS(quantparam);
-
-    for (auto child : loco::succs(node))
-    {
-      auto child_node = loco::must_cast<luci::CircleNode *>(child);
-      if (visit.find(child_node) != visit.end())
-        continue;
-      visit.emplace(child_node);
-      que.emplace_back(child_node);
-
-      if (child_node->quantparam() == nullptr)
-      {
-        if (appendable_operator_opcode.find(child_node->opcode()) ==
-            appendable_operator_opcode.end())
-          continue;
-
-        set_dtype(node, child_node);
-        child_node->quantparam(std::make_unique<luci::CircleQuantParam>());
-        set_quantparam(node, child_node);
-      }
-    }
-  }
+  forward_qparam(g);
 
   // Update output nodes
   auto graph_outputs = g->outputs();
@@ -343,6 +295,60 @@ void QImplant::write(loco::Graph *g)
     // Throw an exception if dtype is not float32
     // TODO Operator-level verification (ex: using QuantizedModelVerifier)
     THROW_UNLESS(circle_node->dtype() != loco::DataType::FLOAT32);
+  }
+}
+
+void QImplant::forward_qparam(loco::Graph *g)
+{
+  std::set<luci::CircleOpcode> forwardable_opcode{
+          luci::CircleOpcode::RESHAPE, luci::CircleOpcode::SPLIT, luci::CircleOpcode::TRANSPOSE};
+
+  auto forwardable = [&forwardable_opcode](luci::CircleOpcode opcode){
+    return forwardable_opcode.find(opcode) != forwardable_opcode.end();
+  };
+
+  std::set<luci::CircleNode *> visited_nodes;
+  auto visited = [&visited_nodes](luci::CircleNode * node){
+    return visited_nodes.find(node) != visited_nodes.end();
+  };
+
+  std::deque<luci::CircleNode *> next_nodes;
+  for (auto input_node : loco::input_nodes(g))
+  {
+    auto node = loco::must_cast<luci::CircleNode *>(input_node);
+    next_nodes.emplace_back(node);
+  }
+
+  // check whether node can share its successor node quantization parameter
+  while (!next_nodes.empty())
+  {
+    auto node = next_nodes.front();
+    next_nodes.pop_front();
+
+    // skip when node is output
+    if (node->opcode() == luci::CircleOpcode::CIRCLEOUTPUT)
+      continue;
+
+    auto quantparam = node->quantparam();
+    if (quantparam == nullptr)
+      continue;
+
+    for (auto successor : loco::succs(node))
+    {
+      auto successor_node = loco::must_cast<luci::CircleNode *>(successor);
+      if(visited(successor_node))
+        continue;
+      visited_nodes.emplace(successor_node);
+      next_nodes.emplace_back(successor_node);
+
+      if (successor_node->quantparam() == nullptr)
+      {
+        if (!forwardable(successor_node->opcode()))
+          continue;
+
+        copy_quantparam(node, successor_node);
+      }
+    }
   }
 }
 
