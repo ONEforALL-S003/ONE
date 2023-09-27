@@ -26,7 +26,7 @@ module = importlib.import_module('import.' + model)
 input_circle = input_dir + '.circle'
 output_circle = output_dir + f'/{module._name_}/output.circle'
 qparam_dir = output_dir + f'/{module._name_}/qparam.json'
-h5_dir = output_dir + f'/{module._name_}/output.h5'
+h5_path = output_dir + f'/{module._name_}/output.h5'
 
 if not os.path.exists(input_circle):
     print('fail to load input circle')
@@ -50,11 +50,14 @@ if not os.path.exists(output_circle):
     print('output circle generate fail')
     quit(255)
 
-# ./circle-tensordump --tensors_to_hdf5 ../luci/tests/Conv2D_000.circle output_path.h5
-subprocess.run([dump, '--tensors_to_hdf5', output_circle, h5_dir], check=True)
+# dump circle to h5
+subprocess.run([dump, '--tensors_to_hdf5', h5_path, output_circle], check=True)
 
-if not os.path.exists(h5_dir):
+if not os.path.exists(h5_path):
     print('h5 dump failed')
+    quit(255)
+
+if not validate(h5_path):
     quit(255)
 
 quit(0)
