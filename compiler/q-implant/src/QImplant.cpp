@@ -32,6 +32,7 @@ using namespace q_implant;
 
 namespace
 {
+
 // Return directory path of given file path
 // TODO Find a platform-independent way to do this
 std::string directory_path(const std::string &file_path)
@@ -294,7 +295,7 @@ void QImplant::forward_qparam(loco::Graph *g)
     return forwardable_opcode.find(opcode) != forwardable_opcode.end();
   };
 
-  for (auto node : loco::postorder_traversal(loco::output_nodes(g)))
+  for (auto node : loco::active_nodes(loco::output_nodes(g)))
   {
     auto circle_node = loco::must_cast<luci::CircleNode *>(node);
     // skip when node is output
@@ -312,11 +313,11 @@ void QImplant::forward_qparam(loco::Graph *g)
       {
         if (!forwardable(successor_node->opcode()))
           continue;
-        assert(circle_node->quantparam());
         copy_quantparam(circle_node, successor_node);
         copy_dtype(circle_node, successor_node);
       }
     }
   }
 }
+
 #undef THROW_UNLESS
