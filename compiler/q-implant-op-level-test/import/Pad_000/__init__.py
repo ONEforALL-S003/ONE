@@ -16,14 +16,6 @@ class Pad_000_Q8(TestCase):
             (1),  # zerop_shape
             0)  # quantized_dimension
 
-        # Generate padding
-        # json_content['padding'] = gen_random_tensor(
-        #     "uint8",  #dtype_str
-        #     (1),  # scale_shape
-        #     (1),  # zerop_shape
-        #     0,  # quantized_dimension
-        #     (4, 2))  # value_shape
-
         # Generate ofm
         json_content['ofm'] = gen_random_tensor(
             "uint8",  # dtype_str

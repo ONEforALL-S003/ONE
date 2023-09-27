@@ -16,14 +16,6 @@ class Mean_000_Q8(TestCase):
             (1),  # zerop_shape
             0)  # quantized_dimension
 
-        # Generate reduction_indices
-        # json_content['reduction_indices'] = gen_random_tensor(
-        #     "uint8",  #dtype_str
-        #     (1),  # scale_shape
-        #     (1),  # zerop_shape
-        #     0,  # quantized_dimension
-        #     (1))  # value_shape (OHWI)
-
         # Generate ofm
         json_content['ofm'] = gen_random_tensor(
             "uint8",  # dtype_str
