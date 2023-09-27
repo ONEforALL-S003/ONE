@@ -14,13 +14,21 @@ def validate(h5_path, qparam_dir, qparam_json):
     with h5.File(h5_path, "r") as model:
         for node_name in model.keys():
             for tensor_name in json_load[node_name]:
-                np_path = f"{qparam_dir}/{tensor_name}"
+                np_path = f"{qparam_dir}/{json_load[node_name][tensor_name]}"
                 if tensor_name == "value":
                     expected_weights = np.load(np_path)
                     h5_weights = model[node_name]["weights"]
                     if np.allclose(h5_weights, expected_weights, rtol=1.e-5, atol=1.e-5) == False:
-                        print("Fake-quantized weights of " + node_name + "." + tensor_name + " (" + str(h5_weights) +
+                        print("Implanted weights of " + node_name + "." + tensor_name + " (" + str(h5_weights) +
                             ") do not match with expected value (" + str(expected_weights) + ").")
+                        flag = False
+
+                if tensor_name == "scale":
+                    expected_scale = np.load(np_path)
+                    h5_scale = model[node_name]["scale"]
+                    if np.allclose(h5_scale, expected_scale, rtol=1.e-5, atol=1.e-5) == False:
+                        print("Implanted scale of " + node_name + "." + tensor_name + " (" + str(h5_scale) +
+                            ") do not match with expected value (" + str(expected_scale) + ").")
                         flag = False
 
                 
