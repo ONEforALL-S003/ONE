@@ -8,13 +8,25 @@ import sys
 
 
 def validate(h5_path, qparam_dir, qparam_json):
+    flag = True
     with open(qparam_json, "r") as qparams:
         json_load = json.load(qparams)
     with h5.File(h5_path, "r") as model:
         for node_name in model.keys():
-            print(node_name)
             for tensor_name in json_load[node_name]:
-                print(node_name)
+                np_path = f"{qparam_dir}/{tensor_name}"
+                if tensor_name == "value":
+                    expected_weights = np.load(np_path)
+                    h5_weights = model[node_name]["weights"]
+                    if np.allclose(h5_weights, expected_weights, rtol=1.e-5, atol=1.e-5) == False:
+                        print("Fake-quantized weights of " + node_name + "." + tensor_name + " (" + str(h5_weights) +
+                            ") do not match with expected value (" + str(expected_weights) + ").")
+                        flag = False
+
+                
+
+    return flag
+
 
 
 def compare_quantization(tensor, tensor_name, expect_dir):
