@@ -18,3 +18,10 @@ Step 3: Generate output.circle to use q-implant
 ```
 "circle file" + "qparam.json" -> q-implant -> "quant circle file"
 ```
+
+Step 4: Dump output.circle to output.h5.
+```
+"output.circle" -> sircle-tensordump -> "output.h5"
+```
+
+Step 5: And compare tensor values of h5 file with numpy arrays due to validate q-implant.
