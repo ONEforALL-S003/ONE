@@ -200,6 +200,109 @@ void set_value(luci::CircleConst *const_node, const std::string &value_path, loc
   }
 }
 
+template <loco::DataType DT> void apply_qparam(luci::CircleConst *node, const luci::CircleQuantParam *qparam)
+{
+  std::vector<typename loco::DataTypeImpl<DT>::Type> values;
+
+  uint32_t quantized_dimension = qparam->quantized_dimension;
+  auto zerop = qparam->zerop;
+  auto scale = qparam->scale;
+  auto mines = qparam->min;
+  auto maxes = qparam->max;
+
+  uint32_t channel_size = 1;
+  uint32_t value_size = 1;
+
+  if (node->rank() != 0)
+  {
+    for (uint32_t i = 0; i < quantized_dimension; i++)
+    {
+      THROW_UNLESS(node->dim(i).known());
+      channel_size *= node->dim(i).value();
+    }
+
+    for (uint32_t i = quantized_dimension; i < node->rank(); i++)
+    {
+      THROW_UNLESS(node->dim(i).known());
+      value_size *= node->dim(i).value();
+    }
+  }
+
+  for (uint32_t c = 0; c < channel_size; ++c)
+  {
+    auto z = zerop.at(c);
+    auto s = scale.at(c);
+    auto offset = c * value_size;
+
+    float min = std::numeric_limits<float>::lowest();
+    float max = std::numeric_limits<float>::max();
+
+    if (mines.size() > c)
+    {
+      min = mines.at(c);
+    }
+
+    if (maxes.size() > c)
+    {
+      max = maxes.at(c);
+    }
+
+    for (uint32_t v = 0; v < value_size; ++v)
+    {
+      float data = node->at<loco::DataType::FLOAT32>(offset + v);
+
+      data = data < min ? min : data;
+      data = data > max ? max : data;
+
+      data = (data - min) / s;
+      values.emplace_back(round(data) + z);
+    }
+  }
+
+  uint32_t total_size = channel_size * value_size;
+
+  node->dtype(DT);
+  node->size<DT>(total_size);
+  for (uint32_t i = 0; i < total_size; i++)
+  {
+    node->at<DT>(i) = values.at(i);
+  }
+
+  auto copy_qparam = std::make_unique<luci::CircleQuantParam>();
+  copy_qparam->scale = scale;
+  copy_qparam->zerop = zerop;
+  copy_qparam->quantized_dimension = quantized_dimension;
+
+  auto circle_node = loco::must_cast<luci::CircleNode *>(node);
+  circle_node->quantparam(std::move(copy_qparam));
+}
+
+void apply_qparam(luci::CircleConst *const_node, const luci::CircleQuantParam *qparam, loco::DataType dtype)
+{
+  assert(const_node->dtype() == loco::DataType::FLOAT32);
+
+  switch (dtype)
+  {
+    case loco::DataType::S8:
+      apply_qparam<loco::DataType::S8>(const_node, qparam);
+      break;
+    case loco::DataType::U8:
+      apply_qparam<loco::DataType::U8>(const_node, qparam);
+      break;
+    case loco::DataType::S16:
+      apply_qparam<loco::DataType::S16>(const_node, qparam);
+      break;
+    case loco::DataType::S32:
+      apply_qparam<loco::DataType::S32>(const_node, qparam);
+      break;
+    case loco::DataType::S64:
+      apply_qparam<loco::DataType::S64>(const_node, qparam);
+      break;
+    default:
+      throw std::runtime_error("Invalid value dtype detected. ");
+  }
+}
+
 } // namespace
 
 void QImplant::write(loco::Graph *g)
@@ -220,7 +323,6 @@ void QImplant::write(loco::Graph *g)
   }
 
   THROW_UNLESS(root.isObject());
-
   for (const auto tensor_name : root.getMemberNames())
   {
     const auto tensor = root[tensor_name];
@@ -233,7 +335,6 @@ void QImplant::write(loco::Graph *g)
     const auto dtype = str_to_dtype(tensor["dtype"].asString());
 
     auto node = name_to_node.at(tensor_name);
-
     // Node must be fp32
     THROW_UNLESS(node->dtype() == loco::DataType::FLOAT32);
 
@@ -254,6 +355,19 @@ void QImplant::write(loco::Graph *g)
   }
 
   forward_qparam(g);
+  std::vector<luci::CircleNode *> all_node;
+  std::vector<std::string > all_node_name;
+  std::vector<std::pair<std::string, luci::CircleNode *>> tmp;
+  for (auto node: loco::active_nodes(loco::output_nodes(g)))
+  {
+    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
+    all_node.emplace_back(circle_node);
+    all_node_name.emplace_back(circle_node->name());
+    if(circle_node->quantparam() == nullptr && circle_node->dtype() == loco::DataType::FLOAT32)
+    {
+      tmp.emplace_back(circle_node->name(), circle_node);
+    }
+  }
 
   // Update output nodes
   auto graph_outputs = g->outputs();
@@ -288,27 +402,68 @@ void QImplant::write(loco::Graph *g)
 
 void QImplant::forward_qparam(loco::Graph *g)
 {
-  std::set<luci::CircleOpcode> forwardable_opcode{
-    luci::CircleOpcode::RESHAPE, luci::CircleOpcode::SPLIT, luci::CircleOpcode::TRANSPOSE};
+  std::set<luci::CircleOpcode> forwardable_opcode;
+  forwardable_opcode.emplace(luci::CircleOpcode::RESHAPE);
+  forwardable_opcode.emplace(luci::CircleOpcode::SPLIT);
+  forwardable_opcode.emplace(luci::CircleOpcode::TRANSPOSE);
+  forwardable_opcode.emplace(luci::CircleOpcode::PAD);
+  forwardable_opcode.emplace(luci::CircleOpcode::MEAN);
+  forwardable_opcode.emplace(luci::CircleOpcode::PADV2);
+  forwardable_opcode.emplace(luci::CircleOpcode::MAX_POOL_2D);
+
 
   auto forwardable = [&forwardable_opcode](luci::CircleOpcode opcode) {
     return forwardable_opcode.find(opcode) != forwardable_opcode.end();
   };
 
+  std::vector<std::string> vec;
   for (auto node : loco::active_nodes(loco::output_nodes(g)))
   {
     auto circle_node = loco::must_cast<luci::CircleNode *>(node);
-    // skip when node is output
-    if (circle_node->opcode() == luci::CircleOpcode::CIRCLEOUTPUT)
-      continue;
+    vec.emplace_back(circle_node->name());
+  }
+
+  for (auto node : loco::active_nodes(loco::output_nodes(g)))
+  {
+    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
 
     auto quantparam = circle_node->quantparam();
-    if (quantparam == nullptr)
-      continue;
+
+    if (quantparam == nullptr){
+      if (circle_node->opcode() == luci::CircleOpcode::PADV2){
+        auto pad_v2 = reinterpret_cast<luci::CirclePadV2 *>(circle_node);
+        auto constant_values_node = loco::must_cast<luci::CircleConst *>(pad_v2->constant_values());
+        if (constant_values_node->quantparam() == nullptr && constant_values_node->dtype() == loco::DataType::FLOAT32){
+          apply_qparam(constant_values_node, quantparam, circle_node->dtype());
+        }
+      }
+      else if(circle_node->opcode() == luci::CircleOpcode::ADD)
+      {
+        auto add = reinterpret_cast<luci::CircleAdd *>(circle_node);
+        auto x_node = loco::must_cast<luci::CircleNode *>(add->x());
+        auto y_node = loco::must_cast<luci::CircleNode *>(add->y());
+        auto x_qparam = x_node->quantparam();
+        auto y_qparam = y_node->quantparam();
+        if (x_qparam != nullptr && y_qparam != nullptr && x_qparam->scale == y_qparam->scale && x_qparam->zerop == y_qparam->zerop)
+        {
+          copy_quantparam(x_node, add);
+          copy_dtype(x_node, add);
+        }
+        else
+        {
+          std::cout << "1";
+        }
+      }
+      else
+      {
+        continue;
+      }
+    }
 
     for (auto successor : loco::succs(node))
     {
       auto successor_node = loco::must_cast<luci::CircleNode *>(successor);
+
       if (successor_node->quantparam() == nullptr)
       {
         if (!forwardable(successor_node->opcode()))
