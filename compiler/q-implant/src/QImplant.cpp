@@ -23,6 +23,7 @@
 #include <json.h>
 #include <fstream>
 #include <unordered_map>
+#include <utility>
 
 using namespace q_implant;
 
@@ -32,6 +33,10 @@ using namespace q_implant;
 
 namespace
 {
+// TODO: Find opcodes which can be appended in conversion
+std::set<luci::CircleOpcode> appendable_operator_opcode{
+  luci::CircleOpcode::CONCATENATION, luci::CircleOpcode::RESHAPE, luci::CircleOpcode::SPLIT,
+  luci::CircleOpcode::TRANSPOSE};
 
 // Return directory path of given file path
 // TODO Find a platform-independent way to do this
@@ -103,6 +108,8 @@ Json::Value load_json(const std::string &path)
 
 void set_dtype(luci::CircleNode *node, loco::DataType dtype) { node->dtype(dtype); }
 
+void set_dtype(luci::CircleNode *origin, luci::CircleNode *dest) { dest->dtype(origin->dtype()); }
+
 void set_scale(luci::CircleNode *node, const std::string &scale_path)
 {
   assert(node);               // FIX CALLER UNLESS
@@ -141,6 +148,21 @@ void set_quantized_dimension(luci::CircleNode *node, const uint32_t quantized_di
   assert(node->quantparam()); // FIX CALLER UNLESS
 
   node->quantparam()->quantized_dimension = quantized_dimension;
+}
+
+// TODO: think about which method is correct(deep or shallow copy)
+void set_quantparam(luci::CircleNode *origin, luci::CircleNode *dest)
+{
+  assert(origin);
+  auto origin_quantparam = origin->quantparam();
+  assert(origin_quantparam);
+
+  assert(dest);
+  auto dest_quantparam = dest->quantparam();
+  assert(dest_quantparam);
+  dest_quantparam->zerop = origin_quantparam->zerop;
+  dest_quantparam->scale = origin_quantparam->scale;
+  dest_quantparam->quantized_dimension = origin_quantparam->quantized_dimension;
 }
 
 template <loco::DataType DT> void set_value(luci::CircleConst *node, const std::string &value_path)
@@ -248,6 +270,55 @@ void QImplant::write(loco::Graph *g)
       const auto value_path = dir_path + '/' + tensor["value"].asString();
 
       set_value(const_node, value_path, dtype);
+    }
+  }
+
+  std::set<luci::NodeName> visit;
+  std::deque<std::pair<luci::CircleNode *, luci::CircleQuantParam *>> que;
+  for (auto input_node : loco::input_nodes(g))
+  {
+    auto node = loco::must_cast<luci::CircleNode *>(input_node);
+    auto quantparam = node->quantparam();
+    THROW_UNLESS(quantparam);
+    for (auto child : loco::succs(node))
+    {
+      auto child_node = loco::must_cast<luci::CircleNode *>(child);
+      auto child_node_name = child_node->name();
+      if (visit.find(child_node_name) != visit.end())
+        continue;
+      visit.emplace(child_node_name);
+      que.emplace_back(std::make_pair(child_node, quantparam));
+    }
+  }
+
+  while (!que.empty())
+  {
+    auto node_qparam = que.front();
+    que.pop_front();
+    auto node = node_qparam.first;
+    auto quantparam = node_qparam.second;
+    THROW_UNLESS(quantparam);
+    for (auto child : loco::succs(node))
+    {
+      auto child_node = loco::must_cast<luci::CircleNode *>(child);
+      auto child_node_name = child_node->name();
+      if (visit.find(child_node_name) != visit.end())
+        continue;
+      auto child_node_quantparam = child_node->quantparam();
+      if (child_node_quantparam == nullptr)
+      {
+        if (appendable_operator_opcode.find(child_node->opcode()) ==
+            appendable_operator_opcode.end())
+          continue;
+
+        set_dtype(node, child_node);
+        child_node->quantparam(std::make_unique<luci::CircleQuantParam>());
+        child_node_quantparam = child_node->quantparam();
+        set_quantparam(node, child_node);
+      }
+
+      visit.emplace(child_node_name);
+      que.emplace_back(std::make_pair(child_node, child_node_quantparam));
     }
   }
 
