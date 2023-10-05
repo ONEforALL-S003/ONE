@@ -23,6 +23,7 @@
 #include <json.h>
 #include <fstream>
 #include <unordered_map>
+#include <luci/Profile/CircleNodeOrigin.h>
 
 using namespace q_implant;
 
@@ -284,6 +285,46 @@ void QImplant::write(loco::Graph *g)
     // TODO Operator-level verification (ex: using QuantizedModelVerifier)
     THROW_UNLESS(circle_node->dtype() != loco::DataType::FLOAT32);
   }
+
+  for (auto node : loco::input_nodes(g))
+  {
+    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
+    auto quantize = node->graph()->nodes()->create<luci::CircleQuantize>();
+    quantize->name(circle_node->name() + "_Quantize");
+    quantize->dtype(circle_node->dtype());
+    quantize->rank(circle_node->rank());
+    for (uint32_t i = 0; i < circle_node->rank(); ++i)
+      quantize->dim(i).set(circle_node->dim(i).value());
+
+    quantize->shape_status(luci::ShapeStatus::VALID);
+
+    copy_quantparam(circle_node, quantize);
+    circle_node->quantparam(nullptr);
+    circle_node->dtype(loco::DataType::FLOAT32);
+
+    loco::replace(circle_node).with(quantize);
+    quantize->input(circle_node);
+    luci::add_origin(quantize, luci::get_origin(circle_node));
+  }
+
+  for (auto node : loco::output_nodes(g))
+  {
+    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
+    auto dequantize = node->graph()->nodes()->create<luci::CircleDequantize>();
+    dequantize->name(circle_node->name() + "_DeQuantize");
+    dequantize->dtype(circle_node->dtype());
+    dequantize->rank(circle_node->rank());
+
+    for (uint32_t i = 0; i < circle_node->rank(); ++i)
+      dequantize->dim(i).set(circle_node->dim(i).value());
+
+    dequantize->shape_status(luci::ShapeStatus::VALID);
+    copy_quantparam(circle_node, dequantize);
+    dequantize->dtype(loco::DataType::FLOAT32);
+    loco::replace(circle_node).with(dequantize);
+    dequantize->input(circle_node);
+    luci::add_origin(dequantize, luci::get_origin(circle_node));
+  }
 }
 
 void QImplant::forward_qparam(loco::Graph *g)
@@ -299,6 +340,8 @@ void QImplant::forward_qparam(loco::Graph *g)
   forwardable_opcode.emplace(luci::CircleOpcode::RESHAPE);
   forwardable_opcode.emplace(luci::CircleOpcode::SPLIT);
   forwardable_opcode.emplace(luci::CircleOpcode::TRANSPOSE);
+  forwardable_opcode.emplace(luci::CircleOpcode::PAD);
+  forwardable_opcode.emplace(luci::CircleOpcode::MEAN);
   // TODO add more Ops
 
   auto forwardable = [&forwardable_opcode](luci::CircleOpcode opcode) {
