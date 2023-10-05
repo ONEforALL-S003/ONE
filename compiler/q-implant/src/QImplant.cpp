@@ -613,12 +613,6 @@ void QImplant::forward_qparam(loco::Graph *g)
     return forwardable_opcode.find(opcode) != forwardable_opcode.end();
   };
 
-  std::vector<std::string> vec;
-  for (auto node : loco::active_nodes(loco::output_nodes(g)))
-  {
-    auto circle_node = loco::must_cast<luci::CircleNode *>(node);
-    vec.emplace_back(circle_node->name());
-  }
 
   for (auto node : loco::active_nodes(loco::output_nodes(g)))
   {
